@@ -68,6 +68,7 @@ function getLine(cnt, text) {
   height: 10vh;
 }
 .code-container {
+  background-color: #fff;
   display: flex;
 }
 .leftblank {

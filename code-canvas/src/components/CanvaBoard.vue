@@ -5,6 +5,8 @@ import BaseBoard from "./BaseBoard.vue";
 import { ref, onMounted, watch, defineEmits, defineProps } from "vue";
 import { diff } from "../utils/tool";
 import { debounce, cloneDeep } from "xijs";
+import func from "../../../vue-temp/vue-editor-bridge";
+const rectTypes = ["var", "static", "array"];
 const emit = defineEmits(["next", "change"]);
 interface IBaseShapeProp {
   key: string;
@@ -22,6 +24,7 @@ const mouseAbsPos = ref({
   y: 0,
 });
 const curSelect = ref("");
+let curPoint = "";
 let templateDot: any[] = [];
 
 const canvasBox = ref<IBaseShapeProp[]>([]);
@@ -45,25 +48,60 @@ const handleShapeClick = (name: string) => {
 
 const handleMouseChange = (x: number, y: number) => {
   mouseAbsPos.value = { x, y };
-  // 如果有选中的元素, 则判断为移动当前选中元素
-  if (curSelect.value && templateDot.length) {
+  // console.log(templateDot)
+  if (curSelect.value.length && templateDot.length) {
     const [x0, y0] = templateDot;
-    // canvasBox.value = canvasBox.value.map((v) => {
-    //   if (v.key === curSelect.value) {
-    //     const { left, top } = v.style;
-    //     templateDot = [x, y];
-    //     return {
-    //       ...v,
-    //       style: {
-    //         ...v.style,
-    //         left: parseFloat(left) + (x - x0) + "px",
-    //         top: parseFloat(top) + (y - y0) + "px",
-    //       },
-    //     };
-    //   }
-    //   return v;
-    // });
-    return;
+    canvasBox.value = canvasBox.value.map((v) => {
+      templateDot = [x, y];
+      if (v.key === curSelect.value) {
+        let { height, width, left, top } = v.style;
+        left = parseFloat(left);
+        top = parseFloat(top);
+        height = parseFloat(height);
+        width = parseFloat(width);
+        // 如果有选中的点，判断为拉伸元素
+        if (curPoint.length) {
+          console.log(curPoint);
+          const hasLeft = curPoint.includes("l");
+          const hasRight = curPoint.includes("r");
+          const hasTop = curPoint.includes("t");
+          const hasBottom = curPoint.includes("b");
+          if (hasLeft) {
+            left += x - x0;
+            width += x0 - x;
+          }
+          if (hasRight) width += x - x0;
+          if (hasTop) {
+            top += y - y0;
+            height += y0 - y;
+          }
+          if (hasBottom) height += y - y0;
+          return {
+            ...v,
+            style: {
+              ...v.style,
+              left: left + "px",
+              top: top + "px",
+              height: height + "px",
+              width: width + "px",
+            },
+          };
+        }
+        // 如果有选中的元素, 则判断为移动当前选中元素
+        else {
+          return {
+            ...v,
+            style: {
+              ...v.style,
+              left: left + (x - x0) + "px",
+              top: top + (y - y0) + "px",
+            },
+          };
+        }
+      }
+      return v;
+    });
+    showLine();
   }
   // 否则则生成元素
   const [a1, b1, key] = templateDot;
@@ -88,37 +126,31 @@ const handleMouseChange = (x: number, y: number) => {
 const handleMouseDown = () => {
   const { x, y } = mouseAbsPos.value;
   templateDot = [x, y];
-  if (!curSelect.value && typeName.value.length) {
+  if (!curSelect.value.length && typeName.value.length) {
     templateDot[2] = Date.now() + "";
     canvasBox.value.push({
       key: templateDot[2],
       typeName: typeName.value,
-      style: {}
+      style: {},
     });
   }
+  curPoint = "";
 };
 
 const handleMouseUp = () => {
   const { x, y } = mouseAbsPos.value;
-  // if (typeName.value) {
-  //   canvasBox.value = canvasBox.value.filter((v) => {
-  //     return parseInt(v.style.height) > 40 && parseInt(v.style.width) > 50;
-  //   });
-  //   templateDot = [];
-  //   return;
-  // }
-  // 重置
   templateDot = [];
 };
 
 const handleSelected = (key: string) => {
-  console.log(key);
   if (!typeName.value.length) curSelect.value = key;
+  console.log(curSelect.value);
 };
 const handleClearSelect = (e: any) => {
   if (e.target && e.target.getAttribute("data-key") !== curSelect.value) {
     curSelect.value = "";
   }
+  clearLine();
 };
 const handleDel = (key: string) => {
   canvasBox.value = canvasBox.value.filter((v) => v.key !== key);
@@ -192,6 +224,261 @@ const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
 function next() {
   emit("next");
 }
+
+// 拉伸
+const pointList = ["lt", "t", "r", "rb", "b", "lb", "l"];
+const cursor = {
+  // 每个点对应的初始角度
+  lt: "nw-resize",
+  t: "n-resize",
+  rt: "ne-resize",
+  r: "e-resize",
+  rb: "se-resize",
+  b: "s-resize",
+  lb: "sw-resize",
+  l: "w-resize",
+};
+function getPointList(item: IBaseShapeProp) {
+  // console.log(curSelect.value);
+  if (curSelect.value && item.key == curSelect.value) return pointList;
+  else return [];
+}
+function getPointStyle(item: string) {
+  const hasLeft = item.includes("l");
+  const hasRight = item.includes("r");
+  const hasTop = item.includes("t");
+  const hasBottom = item.includes("b");
+  let left = 0;
+  let top = 0;
+  let height = 0;
+  let width = 0;
+  canvasBox.value.forEach((item) => {
+    if (item.key == curSelect.value) {
+      height = parseFloat(item.style.height);
+      width = parseFloat(item.style.width);
+    }
+  });
+  if (item.length == 2) {
+    if (hasRight) left = width;
+    if (hasBottom) top = height;
+  } else {
+    if (hasLeft || hasRight) {
+      top = height / 2;
+      if (hasRight) left = width;
+    }
+    if (hasTop || hasBottom) {
+      left = width / 2;
+      if (hasBottom) top = height;
+    }
+  }
+  return {
+    left: left - 4 + "px",
+    top: top - 4 + "px",
+    cursor: cursor[item],
+  };
+}
+function handleMouseDownPoint(point: string, event: Event) {
+  const { x, y } = mouseAbsPos.value;
+  templateDot = [x, y];
+  event.stopPropagation();
+  curPoint = point;
+}
+function handleMouseUpPoint(point: string, event: Event) {
+  event.stopPropagation();
+  curPoint = "";
+}
+// 贴近适应
+let lines = ref(["xt", "xb", "yl", "yr"]);
+let lineStatus = ref({
+  xt: {
+    status: false,
+    value: {
+      top: "",
+    },
+  },
+  xb: {
+    status: false,
+    value: {
+      top: "",
+    },
+  },
+  yl: {
+    status: false,
+    value: {
+      left: "",
+    },
+  },
+  yr: {
+    status: false,
+    value: {
+      left: "",
+    },
+  },
+});
+let lineCnt = 0;
+function clearLine() {
+  for (let line in lineStatus.value) {
+    lineStatus.value[line].status = false;
+  }
+}
+function showLine() {
+  clearLine();
+  if (lineCnt < 3) {
+    canvasBox.value.forEach((currentItem) => {
+      if (currentItem.key == curSelect.value) {
+        canvasBox.value.forEach((item) => {
+          if (currentItem != item) {
+            const conditions = [
+              {
+                // yll就是只y方向的线，选中的元素左边与场上的元素的左边对齐了
+                type: "yll",
+                isNear: isNear(
+                  parseFloat(item.style.left),
+                  parseFloat(currentItem.style.left)
+                ),
+                value: parseFloat(item.style.left),
+              },
+              {
+                // 选中的左边与场上的右边
+                type: "ylr",
+                isNear: isNear(
+                  parseFloat(item.style.left) + parseFloat(item.style.width),
+                  parseFloat(currentItem.style.left)
+                ),
+                value:
+                  parseFloat(item.style.left) +
+                  parseFloat(item.style.width) +
+                  1,
+              },
+              {
+                type: "yrl",
+                isNear: isNear(
+                  parseFloat(item.style.left),
+                  parseFloat(currentItem.style.left) +
+                    parseFloat(currentItem.style.width)
+                ),
+                value:
+                  parseFloat(item.style.left) -
+                  parseFloat(currentItem.style.width) -
+                  1.5,
+              },
+              {
+                type: "yrr",
+                isNear: isNear(
+                  parseFloat(item.style.left) + parseFloat(item.style.width),
+                  parseFloat(currentItem.style.left) +
+                    parseFloat(currentItem.style.width)
+                ),
+                value:
+                  parseFloat(item.style.left) +
+                  parseFloat(item.style.width) -
+                  parseFloat(currentItem.style.width),
+              },
+              {
+                type: "xtt",
+                isNear: isNear(
+                  parseFloat(item.style.top),
+                  parseFloat(currentItem.style.top)
+                ),
+                value: parseFloat(item.style.top),
+              },
+              {
+                type: "xtb",
+                isNear: isNear(
+                  parseFloat(item.style.top) + parseFloat(item.style.height),
+                  parseFloat(currentItem.style.top)
+                ),
+                value:
+                  parseFloat(item.style.top) +
+                  parseFloat(item.style.height) +
+                  1.5,
+              },
+              {
+                type: "xbt",
+                isNear: isNear(
+                  parseFloat(item.style.top),
+                  parseFloat(currentItem.style.top) +
+                    parseFloat(currentItem.style.height)
+                ),
+                value:
+                  parseFloat(item.style.top) -
+                  parseFloat(currentItem.style.height) -
+                  1,
+              },
+              {
+                type: "xbb",
+                isNear: isNear(
+                  parseFloat(item.style.top) + parseFloat(item.style.height),
+                  parseFloat(currentItem.style.top) +
+                    parseFloat(currentItem.style.height)
+                ),
+                value:
+                  parseFloat(item.style.top) +
+                  parseFloat(item.style.height) -
+                  parseFloat(currentItem.style.height),
+              },
+            ];
+            conditions.forEach((item) => {
+              if (item.isNear) {
+                lineCnt++;
+                const type = item.type;
+                if (/(xt|xb)/.test(type)) {
+                  currentItem.style.top = item.value + "px";
+                  if (/xt/.test(type)) {
+                    lineStatus.value.xt = {
+                      status: true,
+                      value: {
+                        top: item.value + "px",
+                      },
+                    };
+                  }
+                  if (/xb/.test(type)) {
+                    lineStatus.value.xb = {
+                      status: true,
+                      value: {
+                        top:
+                          item.value +
+                          parseFloat(currentItem.style.height) +
+                          1 +
+                          "px",
+                      },
+                    };
+                  }
+                }
+                if (/(yl|yr)/.test(type)) {
+                  currentItem.style.left = item.value + "px";
+                  if (/yl/.test(type)) {
+                    lineStatus.value.yl = {
+                      status: true,
+                      value: {
+                        left: item.value + "px",
+                      },
+                    };
+                  }
+                  if (/yr/.test(type)) {
+                    lineStatus.value.yr = {
+                      status: true,
+                      value: {
+                        left:
+                          item.value +
+                          parseFloat(currentItem.style.width) +
+                          1.5 +
+                          "px",
+                      },
+                    };
+                  }
+                }
+              }
+            });
+          }
+        });
+      }
+    });
+  } else setTimeout(() => (lineCnt = 0), 100);
+}
+function isNear(value1: number, value2: number) {
+  return Math.abs(value1 - value2) < 8;
+}
 watch(canvasBox, debounce(pushRecordFn, 300), { deep: true });
 const props = defineProps(["canvasRect", "line"]);
 watch(
@@ -214,6 +501,7 @@ watch(
             circle: [],
             line: [],
           },
+          handleMouseUp,
         ],
         curIndex: 0,
         maxLimit: 50,
@@ -240,29 +528,45 @@ onMounted(() => {
         <div
           v-for="item in canvasBox"
           :key="item.key"
-          :class="['shape', 'rect', curSelect === item.key ? 'active' : '']"
+          :class="['shape', 'rect', curSelect == item.key ? 'active' : '']"
           :style="{
             left: item.style.left,
             top: item.style.top,
             width: item.style.width,
-            height: item.style.height,
+            lineHeight: item.style.height,
           }"
           :data-key="item.key"
           @mousedown="handleSelected(item.key)"
         >
-          <span
+          <img
+            src="../../public//delete.svg"
             v-if="curSelect === item.key"
             @click="handleDel(item.key)"
             class="delete"
-            >x</span
-          >
-          <span class="type">{{ item.typeName }}</span>
+          />
+          <span
+            v-for="point in getPointList(item)"
+            :key="point"
+            :style="getPointStyle(point)"
+            @mousedown="handleMouseDownPoint(point, $event)"
+            @mouseup="handleMouseUpPoint(point, $event)"
+            class="point"
+          ></span>
+          {{ item.typeName }}
+        </div>
+        <div class="mark-line">
+          <div
+            v-for="line in lines"
+            v-show="lineStatus[line].status"
+            :key="line"
+            :ref="line"
+            class="line"
+            :class="line.includes('x') ? 'xline' : 'yline'"
+            :style="lineStatus[line].value"
+          ></div>
         </div>
       </div>
     </BaseBoard>
-    <!-- <div class="miniMap">
-      <img :src="miniImg" alt="" v-show="miniImg" />
-    </div> -->
     <div class="toolbar">
       <div
         :class="['toolItem', typeName === item ? 'active' : '']"
@@ -270,58 +574,8 @@ onMounted(() => {
         v-for="item in rectTypes"
         :key="item"
       >
-        <!-- <svg width="20" height="16" :style="{marginTop:'6px'}">
-          <rect
-            x="0"
-            y="0"
-            width="20"
-            height="16"
-            style="fill: transparent; stroke: black; stroke-width: 2"
-          />
-        </svg> -->
         <span>{{ item }}</span>
       </div>
-      <!-- <div
-        class="toolItem"
-        :class="['toolItem', curShape === 'circle' ? 'active' : '']"
-        @click="handleShapeClick('circle')"
-      >
-        <svg width="22" height="22">
-          <circle
-            cx="11"
-            cy="11"
-            r="10"
-            stroke="#fff"
-            stroke-width="1"
-            fill="transparent"
-          />
-        </svg>
-      </div>
-      <div
-        class="toolItem"
-        :class="['toolItem', curShape === 'line' ? 'active' : '']"
-        @click="handleShapeClick('line')"
-      >
-        <svg width="22" height="22">
-          <line
-            x1="2"
-            y1="2"
-            x2="20"
-            y2="20"
-            style="stroke: rgb(255, 255, 255); stroke-width: 1"
-          />
-        </svg>
-      </div> -->
-      <!-- <div class="toolItem" :class="['toolItem']" @click="toggleLayer">
-        <span class="toolItem-text">图层</span>
-        <div v-show="layerVisible" class="layerWrap">
-          <h3>图层管理</h3>
-          <div v-for="item in canvasBox.rect" :key="item.key" class="layerItem">
-            <span @click.stop="handleSelected(item.key)">{{ item.key }}</span>
-            <span @click="handleDelItem(item.key)"> 删除 </span>
-          </div>
-        </div>
-      </div> -->
       <div class="toolItem" :class="['toolItem']" @click="undo">
         <span>撤销</span>
       </div>
@@ -379,37 +633,42 @@ onMounted(() => {
     }
   }
   .static {
+    background-color: rgba(250, 250, 250);
     position: absolute;
     line-height: 80vh;
     width: 23vw;
     border: 1px solid rgba(0, 0, 0, 0.5);
+    // background-image: url("../../public/grid.svg");
   }
   .heap {
+    background-color: rgba(250, 250, 250);
     position: absolute;
     line-height: 33vh;
     left: 25vw;
     width: 33vw;
     border: 1px solid rgba(0, 0, 0, 0.5);
+    // background-image: url("../../public/grid.svg");
   }
   .show {
+    background-color: rgba(250, 250, 250);
     position: absolute;
     line-height: 45vh;
     left: 25vw;
     top: 35vh;
     width: 33vw;
     border: 1px solid rgba(0, 0, 0, 0.5);
+    // background-image: url("../../public/grid.svg");
   }
   .shapeWrap {
     height: 80vh;
     .shape {
       // position: relative;
-      border: 1px solid #646cff;
+      border: 1px solid rgba(0, 0, 0);
       background-color: transparent;
-      z-index: 10;
-      overflow: hidden;
-      min-height: 50px;
-      outline: 1px dashed;
-      position: relative;
+      z-index: 1;
+      position: absolute;
+      cursor: move;
+      background-color: #fff;
       .type {
         user-select: none;
         position: absolute;
@@ -417,23 +676,32 @@ onMounted(() => {
         left: 50%;
         transform: translate(-50%, -50%);
       }
+      .point {
+        position: absolute;
+        background: #fff;
+        border: 1px solid #59c7f9;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        z-index: 2;
+      }
       &.active {
-        cursor: move;
         span {
           user-select: none;
           text-align: center;
           line-height: 18px;
         }
         .delete {
-          border-radius: 50%;
-          background-color: rgba(255, 0, 0, 0.8);
+          color: red;
           position: absolute;
-          right: 0px;
-          top: 0px;
-          color: #fff;
+          right: -6px;
+          top: -6px;
+          border: 1px solid #59c7f9;
+          border-radius: 50%;
+          line-height: 12px;
+          width: 12px;
           cursor: pointer;
-          width: 20px;
-          height: 20px;
+          text-align: center;
         }
       }
     }
@@ -479,6 +747,25 @@ onMounted(() => {
     width: 70px;
     text-align: center;
     border: 1px solid rgba(0, 0, 0, 0.5);
+  }
+  .mark-line {
+    position: relative;
+    height: 100%;
+  }
+  .line {
+    background: #59c7f9;
+    position: absolute;
+    z-index: 1000;
+  }
+
+  .xline {
+    width: 100%;
+    height: 1px;
+  }
+
+  .yline {
+    width: 0.5px;
+    height: 100%;
   }
 }
 </style>

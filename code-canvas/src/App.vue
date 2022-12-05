@@ -47,7 +47,7 @@ export default {
         { name: "John", id: 0 },
         { name: "Joao", id: 1 },
         { name: "Jean", id: 2 },
-      ]
+      ],
     };
   },
 };
@@ -87,6 +87,9 @@ export default {
 </template>
 
 <style>
+html {
+  background-color: #f5f5f5;
+}
 .container {
   display: flex;
 }
