@@ -1,5 +1,12 @@
 <script setup>
-import { ref, shallowRef, defineProps, defineEmits, computed } from "vue";
+import {
+  ref,
+  shallowRef,
+  defineProps,
+  defineEmits,
+  computed,
+  onMounted,
+} from "vue";
 import { Codemirror } from "vue-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { java } from "@codemirror/lang-java";
@@ -40,18 +47,35 @@ function getLine(cnt, text) {
   }
   return res;
 }
+const input = ref(null);
+onMounted(() => {
+  input.value.addEventListener("change", () => {
+    const reader = new FileReader();
+    reader.readAsText(input.value.files[0]);
+    reader.onload = () => {
+      code.value = reader.result;
+    };
+  });
+});
 </script>
 <template>
   <div>
     <div class="topblank"></div>
+    <div class="input">
+      <label for="input">选择文件</label>
+      <input id="input" type="file" ref="input" />
+    </div>
     <div class="code-container">
       <div class="leftblank"></div>
       <codemirror
         v-model="code"
+        class="code-content"
         placeholder="Code goes here..."
         :style="{
           height: '80vh',
-          width: '30vw',
+          width: '27vw',
+          marginLeft: '3vw',
+          marginRight: '5vw',
           border: '1px solid rgba(0,0,0,0.4)',
         }"
         :autofocus="true"
@@ -63,15 +87,24 @@ function getLine(cnt, text) {
     </div>
   </div>
 </template>
-<style>
-.topblank {
-  height: 10vh;
-}
+<style lang="less">
 .code-container {
-  background-color: #fff;
   display: flex;
 }
-.leftblank {
-  width: 5vw;
+.code-content {
+  background-color: #fff;
+}
+.input {
+  margin-top: 5vh;
+  line-height: 3vh;
+  margin-bottom: 2vh;
+  label {
+    margin-left: 5vw;
+    background: linear-gradient(to bottom, #eee, #ccc);
+    padding: 5px;
+  }
+  #input {
+    display: none;
+  }
 }
 </style>
