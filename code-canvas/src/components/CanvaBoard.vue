@@ -5,15 +5,18 @@ import BaseBoard from "./BaseBoard.vue";
 import { ref, onMounted, watch, defineEmits, defineProps } from "vue";
 import { diff } from "../utils/tool";
 import { debounce, cloneDeep } from "xijs";
-import func from "../../../vue-temp/vue-editor-bridge";
-const rectTypes = ["var", "static", "array"];
+const rectTypes = ["var", "static"];
 const emit = defineEmits(["next", "change"]);
 interface IBaseShapeProp {
   key: string;
   style: any;
   typeName: string;
+  name: string;
 }
 const typeName = ref("");
+const dragType = ref("");
+const arrayCnt = ref("");
+const defaultName = ref("");
 const boardDom = ref<any>(null);
 const cardOffset = ref({
   x: 0,
@@ -23,6 +26,25 @@ const mouseAbsPos = ref({
   x: 0,
   y: 0,
 });
+function switchVw(raw: string): number {
+  if (raw.includes("vw")) return (innerWidth * parseFloat(raw)) / 100;
+  else if (raw.includes("vh")) return (innerHeight * parseFloat(raw)) / 100;
+  else return 0;
+}
+const defaultSize = {
+  var: {
+    width: switchVw("5vw"),
+    height: switchVw("5vw"),
+  },
+  static: {
+    width: switchVw("25vw") + 4,
+    height: switchVw("10vw") + 1,
+  },
+  array: {
+    width: switchVw("25vw") + 4,
+    height: switchVw("5vw"),
+  },
+};
 const curSelect = ref("");
 let curPoint = "";
 let templateDot: any[] = [];
@@ -41,11 +63,68 @@ const recordManager = ref<any>([
     maxLimit: 50,
   },
 ]);
+// 弃用
 const handleShapeClick = (name: string) => {
   if (typeName.value == name) typeName.value = "";
   else typeName.value = name;
 };
-
+const handleDragStart = (name: string) => {
+  dragType.value = name;
+};
+const handelDragover = (e: DragEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+};
+const handelDrop = (e: DragEvent) => {
+  const { offsetX, offsetY } = e;
+  const type = dragType.value;
+  let { width, height } = defaultSize[type];
+  if (dragType.value == "array") {
+    const lineCnt = Math.ceil(parseInt(arrayCnt.value) / 5);
+    height = height * (lineCnt + 1) + lineCnt;
+    canvasBox.value.push({
+      key: Date.now() + "",
+      style: {
+        left: offsetX - width / 2 + "px",
+        top: offsetY - height / 2 + "px",
+        width: width + "px",
+        height: height + "px",
+      },
+      typeName: "static",
+      name: "static",
+    });
+    const varSize = switchVw("5vw");
+    for (let row = 0; row < lineCnt; row++) {
+      for (let col = 0; col < 5; col++) {
+        console.log(row * 5 + col + 6, parseInt(arrayCnt.value));
+        if (row * 5 + col > parseInt(arrayCnt.value)) break;
+        canvasBox.value.push({
+          key: Date.now() + row * 10 + col + 1 + "",
+          style: {
+            left: offsetX - width / 2 + varSize * col + col + "px",
+            top: offsetY - height / 2 + varSize * row + row * 0.5 + "px",
+            width: varSize + "px",
+            height: varSize + "px",
+          },
+          typeName: "val",
+          name: defaultName.value,
+        });
+      }
+    }
+  } else {
+    canvasBox.value.push({
+      key: Date.now() + "",
+      style: {
+        left: offsetX - width / 2 + "px",
+        top: offsetY - height / 2 + "px",
+        width: width + "px",
+        height: height + "px",
+      },
+      typeName: type,
+      name: type,
+    });
+  }
+};
 const handleMouseChange = (x: number, y: number) => {
   mouseAbsPos.value = { x, y };
   // console.log(templateDot)
@@ -126,14 +205,14 @@ const handleMouseChange = (x: number, y: number) => {
 const handleMouseDown = () => {
   const { x, y } = mouseAbsPos.value;
   templateDot = [x, y];
-  if (!curSelect.value.length && typeName.value.length) {
-    templateDot[2] = Date.now() + "";
-    canvasBox.value.push({
-      key: templateDot[2],
-      typeName: typeName.value,
-      style: {},
-    });
-  }
+  // if (!curSelect.value.length && typeName.value.length) {
+  //   templateDot[2] = Date.now() + "";
+  //   canvasBox.value.push({
+  //     key: templateDot[2],
+  //     typeName: typeName.value,
+  //     style: {},
+  //   });
+  // }
   curPoint = "";
 };
 
@@ -323,7 +402,7 @@ function clearLine() {
 }
 function showLine() {
   clearLine();
-  if (lineCnt < 3) {
+  if (lineCnt < 10) {
     canvasBox.value.forEach((currentItem) => {
       if (currentItem.key == curSelect.value) {
         canvasBox.value.forEach((item) => {
@@ -520,8 +599,14 @@ onMounted(() => {
 
 <template>
   <div class="canvaWrap" @click="handleClearSelect">
-    <BaseBoard msg="几何画板" ref="boardDom" :onMouseChange="handleMouseChange">
-      <div class="static">栈区</div>
+    <BaseBoard
+      msg="几何画板"
+      ref="boardDom"
+      :onMouseChange="handleMouseChange"
+      @dragover="handelDragover"
+      @drop="handelDrop"
+    >
+      <div class="static-area">栈区</div>
       <div class="heap">堆区</div>
       <div class="show">展示区</div>
       <div class="shapeWrap">
@@ -534,6 +619,7 @@ onMounted(() => {
             top: item.style.top,
             width: item.style.width,
             lineHeight: item.style.height,
+            zIndex: item.typeName == 'var' ? 2 : 1,
           }"
           :data-key="item.key"
           @mousedown="handleSelected(item.key)"
@@ -552,7 +638,7 @@ onMounted(() => {
             @mouseup="handleMouseUpPoint(point, $event)"
             class="point"
           ></span>
-          {{ item.typeName }}
+          {{ item.name }}
         </div>
         <div class="mark-line">
           <div
@@ -569,12 +655,36 @@ onMounted(() => {
     </BaseBoard>
     <div class="toolbar">
       <div
-        :class="['toolItem', typeName === item ? 'active' : '']"
-        @click="handleShapeClick(item)"
+        :class="['toolItem', 'rect']"
         v-for="item in rectTypes"
         :key="item"
+        draggable="true"
+        @dragstart="handleDragStart(item)"
       >
         <span>{{ item }}</span>
+      </div>
+      <div
+        :class="[
+          'toolItem',
+          'rect',
+          'array',
+          typeName == 'array' ? 'active' : '',
+        ]"
+      >
+        <span
+          @click="handleShapeClick('array')"
+          :draggable="typeName == 'array'"
+          @dragstart="handleDragStart('array')"
+          >array</span
+        >
+        <div v-if="typeName == 'array'">
+          <input v-model="arrayCnt" placeholder="变量数" @click.stop="null" />
+          <input
+            v-model="defaultName"
+            placeholder="默认值"
+            @click.stop="null"
+          />
+        </div>
       </div>
       <div class="toolItem" :class="['toolItem']" @click="undo">
         <span>撤销</span>
@@ -631,12 +741,25 @@ onMounted(() => {
         vertical-align: middle;
       }
     }
+    .rect {
+      cursor: grab;
+    }
+    .array {
+      cursor: pointer;
+      input {
+        border: none;
+        height: 28px;
+        width: 50px;
+        font-size: 12px;
+        text-align: center;
+      }
+    }
   }
-  .static {
+  .static-area {
     background-color: rgba(250, 250, 250);
     position: absolute;
     line-height: 80vh;
-    width: 23vw;
+    width: 28vw;
     border: 1px solid rgba(0, 0, 0, 0.5);
     // background-image: url("../../public/grid.svg");
   }
@@ -644,8 +767,8 @@ onMounted(() => {
     background-color: rgba(250, 250, 250);
     position: absolute;
     line-height: 33vh;
-    left: 25vw;
-    width: 33vw;
+    left: 31vw;
+    width: 28vw;
     border: 1px solid rgba(0, 0, 0, 0.5);
     // background-image: url("../../public/grid.svg");
   }
@@ -653,9 +776,9 @@ onMounted(() => {
     background-color: rgba(250, 250, 250);
     position: absolute;
     line-height: 45vh;
-    left: 25vw;
+    left: 31vw;
     top: 35vh;
-    width: 33vw;
+    width: 28vw;
     border: 1px solid rgba(0, 0, 0, 0.5);
     // background-image: url("../../public/grid.svg");
   }

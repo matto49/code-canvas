@@ -75,7 +75,6 @@ onMounted(() => {
           height: '80vh',
           width: '27vw',
           marginLeft: '3vw',
-          marginRight: '5vw',
           border: '1px solid rgba(0,0,0,0.4)',
         }"
         :autofocus="true"

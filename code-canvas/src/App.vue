@@ -14,6 +14,8 @@ function next() {
 }
 let canvas = ref(null);
 function focus(lineCnt) {
+  canvasRect[lineCnt - 1] = canvasRect[line.value - 1];
+  console.log(canvasRect, lineCnt, line.value);
   line.value = lineCnt;
 }
 function changeCanvas(rectData) {
@@ -22,7 +24,6 @@ function changeCanvas(rectData) {
   console.log(value);
 }
 function click(line) {
-  console.log(line);
   const lineDom = document.querySelectorAll(".cm-line");
   for (let i = 0; i < lineDom.length; i++) {
     lineDom[i].classList.remove("cm-activeLine");
@@ -74,15 +75,6 @@ export default {
       class="canvas"
       ref="canvas"
     ></canvasBoard>
-    <div class="row">
-      <draggable :list="list" item-key="name">
-        <template #item="{ element }">
-          <div>
-            {{ element.name }}
-          </div>
-        </template>
-      </draggable>
-    </div>
   </div>
 </template>
 
