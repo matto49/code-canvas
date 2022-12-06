@@ -15,13 +15,11 @@ function next() {
 let canvas = ref(null);
 function focus(lineCnt) {
   canvasRect[lineCnt - 1] = canvasRect[line.value - 1];
-  console.log(canvasRect, lineCnt, line.value);
   line.value = lineCnt;
 }
 function changeCanvas(rectData) {
   const value = rectData.map((item) => toRaw(item));
   canvasRect[line.value - 1] = value;
-  console.log(value);
 }
 function click(line) {
   const lineDom = document.querySelectorAll(".cm-line");

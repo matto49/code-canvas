@@ -38,9 +38,6 @@ export default {
     draggable,
   },
   name: "nested-draggable",
-  updated() {
-    console.log("update", this.tasks);
-  },
 };
 </script>
 <style scoped>

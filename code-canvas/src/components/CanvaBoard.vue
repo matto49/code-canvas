@@ -12,12 +12,14 @@ interface IBaseShapeProp {
   style: any;
   typeName: string;
   name: string;
+  father: string;
 }
 const typeName = ref("");
 const dragType = ref("");
 const arrayCnt = ref("");
 const defaultName = ref("");
 const boardDom = ref<any>(null);
+const curDblclick = ref("");
 const cardOffset = ref({
   x: 0,
   y: 0,
@@ -92,11 +94,11 @@ const handelDrop = (e: DragEvent) => {
       },
       typeName: "static",
       name: "static",
+      father: "",
     });
     const varSize = switchVw("5vw");
     for (let row = 0; row < lineCnt; row++) {
       for (let col = 0; col < 5; col++) {
-        console.log(row * 5 + col + 6, parseInt(arrayCnt.value));
         if (row * 5 + col > parseInt(arrayCnt.value)) break;
         canvasBox.value.push({
           key: Date.now() + row * 10 + col + 1 + "",
@@ -108,6 +110,7 @@ const handelDrop = (e: DragEvent) => {
           },
           typeName: "val",
           name: defaultName.value,
+          father: "",
         });
       }
     }
@@ -122,13 +125,17 @@ const handelDrop = (e: DragEvent) => {
       },
       typeName: type,
       name: type,
+      father: "",
     });
   }
 };
 const handleMouseChange = (x: number, y: number) => {
   mouseAbsPos.value = { x, y };
-  // console.log(templateDot)
-  if (curSelect.value.length && templateDot.length) {
+  if (
+    curSelect.value.length &&
+    templateDot.length &&
+    !curDblclick.value.length
+  ) {
     const [x0, y0] = templateDot;
     canvasBox.value = canvasBox.value.map((v) => {
       templateDot = [x, y];
@@ -140,7 +147,6 @@ const handleMouseChange = (x: number, y: number) => {
         width = parseFloat(width);
         // 如果有选中的点，判断为拉伸元素
         if (curPoint.length) {
-          console.log(curPoint);
           const hasLeft = curPoint.includes("l");
           const hasRight = curPoint.includes("r");
           const hasTop = curPoint.includes("t");
@@ -205,29 +211,24 @@ const handleMouseChange = (x: number, y: number) => {
 const handleMouseDown = () => {
   const { x, y } = mouseAbsPos.value;
   templateDot = [x, y];
-  // if (!curSelect.value.length && typeName.value.length) {
-  //   templateDot[2] = Date.now() + "";
-  //   canvasBox.value.push({
-  //     key: templateDot[2],
-  //     typeName: typeName.value,
-  //     style: {},
-  //   });
-  // }
   curPoint = "";
 };
 
 const handleMouseUp = () => {
-  const { x, y } = mouseAbsPos.value;
   templateDot = [];
 };
 
 const handleSelected = (key: string) => {
   if (!typeName.value.length) curSelect.value = key;
-  console.log(curSelect.value);
+};
+const handleDblclick = (key: string, e: MouseEvent) => {
+  curDblclick.value = key;
+  e.preventDefault;
 };
 const handleClearSelect = (e: any) => {
   if (e.target && e.target.getAttribute("data-key") !== curSelect.value) {
     curSelect.value = "";
+    curDblclick.value = "";
   }
   clearLine();
 };
@@ -318,7 +319,6 @@ const cursor = {
   l: "w-resize",
 };
 function getPointList(item: IBaseShapeProp) {
-  // console.log(curSelect.value);
   if (curSelect.value && item.key == curSelect.value) return pointList;
   else return [];
 }
@@ -394,7 +394,7 @@ let lineStatus = ref({
     },
   },
 });
-let lineCnt = 0;
+let lineCnt = new Map();
 function clearLine() {
   for (let line in lineStatus.value) {
     lineStatus.value[line].status = false;
@@ -402,10 +402,13 @@ function clearLine() {
 }
 function showLine() {
   clearLine();
-  if (lineCnt < 10) {
-    canvasBox.value.forEach((currentItem) => {
-      if (currentItem.key == curSelect.value) {
-        canvasBox.value.forEach((item) => {
+  canvasBox.value.forEach((currentItem) => {
+    if (currentItem.key == curSelect.value) {
+      canvasBox.value.forEach((item) => {
+        let cnt = 0;
+        if (lineCnt.has(item.key)) cnt = lineCnt.get(item.key);
+        else lineCnt.set(item.key, 0);
+        if (cnt < 3) {
           if (currentItem != item) {
             const conditions = [
               {
@@ -497,17 +500,17 @@ function showLine() {
                   parseFloat(currentItem.style.height),
               },
             ];
-            conditions.forEach((item) => {
-              if (item.isNear) {
-                lineCnt++;
-                const type = item.type;
+            conditions.forEach((condition) => {
+              if (condition.isNear) {
+                lineCnt.set(item.key, lineCnt.get(item.key) + 1);
+                const type = condition.type;
                 if (/(xt|xb)/.test(type)) {
-                  currentItem.style.top = item.value + "px";
+                  currentItem.style.top = condition.value + "px";
                   if (/xt/.test(type)) {
                     lineStatus.value.xt = {
                       status: true,
                       value: {
-                        top: item.value + "px",
+                        top: condition.value + "px",
                       },
                     };
                   }
@@ -516,7 +519,7 @@ function showLine() {
                       status: true,
                       value: {
                         top:
-                          item.value +
+                          condition.value +
                           parseFloat(currentItem.style.height) +
                           1 +
                           "px",
@@ -525,12 +528,12 @@ function showLine() {
                   }
                 }
                 if (/(yl|yr)/.test(type)) {
-                  currentItem.style.left = item.value + "px";
+                  currentItem.style.left = condition.value + "px";
                   if (/yl/.test(type)) {
                     lineStatus.value.yl = {
                       status: true,
                       value: {
-                        left: item.value + "px",
+                        left: condition.value + "px",
                       },
                     };
                   }
@@ -539,7 +542,7 @@ function showLine() {
                       status: true,
                       value: {
                         left:
-                          item.value +
+                          condition.value +
                           parseFloat(currentItem.style.width) +
                           1.5 +
                           "px",
@@ -550,10 +553,13 @@ function showLine() {
               }
             });
           }
-        });
-      }
-    });
-  } else setTimeout(() => (lineCnt = 0), 100);
+        } else
+          setTimeout(() => {
+            lineCnt.set(item.key, 0);
+          }, 100);
+      });
+    }
+  });
 }
 function isNear(value1: number, value2: number) {
   return Math.abs(value1 - value2) < 8;
@@ -622,7 +628,6 @@ onMounted(() => {
             zIndex: item.typeName == 'var' ? 2 : 1,
           }"
           :data-key="item.key"
-          @mousedown="handleSelected(item.key)"
         >
           <img
             src="../../public//delete.svg"
@@ -638,7 +643,16 @@ onMounted(() => {
             @mouseup="handleMouseUpPoint(point, $event)"
             class="point"
           ></span>
-          {{ item.name }}
+          <div
+            class="content"
+            @dblclick="handleDblclick(item.key, $event)"
+            :contenteditable="curDblclick == item.key ? 'true' : 'false'"
+            :data-key="item.key"
+            @mousedown="handleSelected(item.key)"
+            :style="{ cursor: curDblclick == item.key ? 'text' : '' }"
+          >
+            {{ item.name }}
+          </div>
         </div>
         <div class="mark-line">
           <div
@@ -792,6 +806,7 @@ onMounted(() => {
       position: absolute;
       cursor: move;
       background-color: #fff;
+      user-select: none;
       .type {
         user-select: none;
         position: absolute;
@@ -807,6 +822,10 @@ onMounted(() => {
         height: 8px;
         border-radius: 50%;
         z-index: 2;
+      }
+      .content {
+        width: 100%;
+        height: 100%;
       }
       &.active {
         span {
