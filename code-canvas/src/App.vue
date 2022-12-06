@@ -33,15 +33,11 @@ function click(line) {
 }
 </script>
 <script>
-import draggable from "vuedraggable";
 let id = 1;
 export default {
   name: "simple",
   display: "Simple",
   order: 0,
-  components: {
-    draggable,
-  },
   data() {
     return {
       list: [
