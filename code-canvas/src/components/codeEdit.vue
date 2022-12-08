@@ -68,6 +68,7 @@ onMounted(() => {
     <div class="code-container">
       <div class="leftblank"></div>
       <codemirror
+        :disabled="true"
         v-model="code"
         class="code-content"
         placeholder="Code goes here..."

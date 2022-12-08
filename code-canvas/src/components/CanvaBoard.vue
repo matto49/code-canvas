@@ -6,7 +6,9 @@ import { ref, onMounted, watch, defineEmits, defineProps } from "vue";
 import { diff } from "../utils/tool";
 import { debounce, cloneDeep } from "xijs";
 const rectTypes = ["var", "static"];
-const emit = defineEmits(["next", "change"]);
+const emit = defineEmits(["next", "change", "pre"]);
+// 编辑/展示 edit/show
+const status = ref("edit");
 interface IBaseShapeProp {
   key: string;
   style: any;
@@ -28,6 +30,7 @@ const mouseAbsPos = ref({
   x: 0,
   y: 0,
 });
+const props = defineProps(["canvasRect", "curStep", "isNextAble", "isPreAble"]);
 function switchVw(raw: string): number {
   if (raw.includes("vw")) return (innerWidth * parseFloat(raw)) / 100;
   else if (raw.includes("vh")) return (innerHeight * parseFloat(raw)) / 100;
@@ -245,12 +248,12 @@ const handleClear = () => {
 
 const undo = () => {
   // 撤销
-  const { snapshots, maxLimit, curIndex } = recordManager.value[props.line - 1];
+  const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
   if (curIndex === 0) return;
-  recordManager.value[props.line - 1].curIndex--;
+  recordManager.value[props.curStep].curIndex--;
   canvasBox.value = cloneDeep(
-    recordManager.value[props.line - 1].snapshots[
-      recordManager.value[props.line - 1].curIndex
+    recordManager.value[props.curStep].snapshots[
+      recordManager.value[props.curStep].curIndex
     ]
   );
   emit("change", canvasBox.value);
@@ -258,14 +261,15 @@ const undo = () => {
 
 const redo = () => {
   // 重做
-  const { snapshots, maxLimit, curIndex } = recordManager.value[props.line - 1];
+  const { snapshots, maxLimit, curIndex } =
+    recordManager.value[props.lincurStepe - 1];
   if (curIndex >= snapshots.length - 1) {
     return;
   }
-  recordManager.value[props.line - 1].curIndex++;
+  recordManager.value[props.curStep].curIndex++;
   canvasBox.value =
-    recordManager.value[props.line - 1].snapshots[
-      recordManager.value[props.line - 1].curIndex
+    recordManager.value[props.curStep].snapshots[
+      recordManager.value[props.curStep].curIndex
     ];
   emit("change", canvasBox.value);
 };
@@ -282,7 +286,7 @@ const handleDelItem = (key: string) => {
 };
 
 const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
-  const { snapshots, maxLimit, curIndex } = recordManager.value[props.line - 1];
+  const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
   // 如果两个状态相同, 则不推入历史记录
   if (!diff(state, snapshots[curIndex])) {
     return;
@@ -296,15 +300,17 @@ const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
     snapshots.shift();
   }
 
-  recordManager.value[props.line - 1].snapshots.push(cloneDeep(state));
-  recordManager.value[props.line - 1].curIndex =
-    recordManager.value[props.line - 1].snapshots.length - 1;
+  recordManager.value[props.curStep].snapshots.push(cloneDeep(state));
+  recordManager.value[props.curStep].curIndex =
+    recordManager.value[props.curStep].snapshots.length - 1;
   emit("change", canvasBox.value);
 };
 function next() {
-  emit("next");
+  if (props.isNextAble) emit("next");
 }
-
+function pre() {
+  if (props.isPreAble) emit("pre");
+}
 // 拉伸
 const pointList = ["lt", "t", "r", "rb", "b", "lb", "l"];
 const cursor = {
@@ -564,8 +570,16 @@ function showLine() {
 function isNear(value1: number, value2: number) {
   return Math.abs(value1 - value2) < 8;
 }
+// 编辑变量双向绑定
+function handleChangeItemName(key: string, e: Event) {
+  canvasBox.value.map((item) => {
+    if (item.key == key) {
+      item.name = e.target.innerText;
+    }
+  });
+  emit("change", canvasBox.value);
+}
 watch(canvasBox, debounce(pushRecordFn, 300), { deep: true });
-const props = defineProps(["canvasRect", "line"]);
 watch(
   () => props.canvasRect,
   () => {
@@ -576,10 +590,10 @@ watch(
   }
 );
 watch(
-  () => props.line,
+  () => props.curStep,
   () => {
-    if (!recordManager.value[props.line - 1])
-      recordManager.value[props.line - 1] = {
+    if (!recordManager.value[props.curStep])
+      recordManager.value[props.curStep] = {
         snapshots: [
           {
             rect: [],
@@ -649,6 +663,7 @@ onMounted(() => {
             :contenteditable="curDblclick == item.key ? 'true' : 'false'"
             :data-key="item.key"
             @mousedown="handleSelected(item.key)"
+            @blur="handleChangeItemName(item.key, $event)"
             :style="{ cursor: curDblclick == item.key ? 'text' : '' }"
           >
             {{ item.name }}
@@ -713,7 +728,8 @@ onMounted(() => {
         <span>下载</span>
       </div> -->
     </div>
-    <div class="next" @click="next">next</div>
+    <div :class="['pre', isPreAble ? 'able' : '']" @click="pre">pre</div>
+    <div :class="['next', isNextAble ? 'able' : '']" @click="next">next</div>
   </div>
 </template>
 
@@ -881,14 +897,29 @@ onMounted(() => {
       }
     }
   }
+  .pre {
+    position: absolute;
+    top: -8vh;
+    right: 15vw;
+    line-height: 50px;
+    width: 70px;
+    text-align: center;
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    &.able:hover {
+      background-color: rgba(110, 38, 236, 0.1);
+    }
+  }
   .next {
     position: absolute;
-    top: -7vh;
+    top: -8vh;
     right: 5vw;
     line-height: 50px;
     width: 70px;
     text-align: center;
     border: 1px solid rgba(0, 0, 0, 0.5);
+    &.able:hover {
+      background-color: rgba(110, 38, 236, 0.1);
+    }
   }
   .mark-line {
     position: relative;

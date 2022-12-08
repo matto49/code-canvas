@@ -4,29 +4,67 @@
 import HelloWorld from "./components/HelloWorld.vue";
 import codeEdit from "./components/codeEdit.vue";
 import canvasBoard from "./components/CanvaBoard.vue";
+import { cloneDeep } from "xijs";
 import { reactive, ref, unref, watch, toRaw } from "vue";
-const canvasRect = reactive(new Array(100).fill([]));
+const canvasRect = reactive([
+  {
+    rect: [],
+    lineCnt: 1,
+  },
+]);
 const selection = reactive({});
-let line = ref(1);
+// pre按钮是否可用
+const isPreAble = ref(false);
+// next按钮是否可用
+const isNextAble = ref(false);
+// 用于判断是否可以执行next
+let maxStep = 0;
+let curStep = ref(0);
+function pre() {
+  curStep.value--;
+  // 仅当next到底了，才能进行下一步操作
+  click(canvasRect[curStep.value].lineCnt);
+  isNextAble.value = true;
+  console.log(curStep.value, "pre", maxStep);
+  if (curStep.value == 0) isPreAble.value = false;
+}
 function next() {
-  line.value += 1;
-  click(line.value);
+  curStep.value++;
+  maxStep = Math.max(curStep.value, maxStep);
+  click(canvasRect[curStep.value].lineCnt);
+  isPreAble.value = true;
+  console.log(curStep.value, "next", maxStep);
+  if (curStep.value == maxStep) isNextAble.value = false;
 }
 let canvas = ref(null);
+let preLine = 1;
 function focus(lineCnt) {
-  canvasRect[lineCnt - 1] = canvasRect[line.value - 1];
-  line.value = lineCnt;
+  // focus事件大量触发，只有在lineCnt发生变化时才处理
+  if (lineCnt == preLine || curStep.value != maxStep) {
+    console.log(curStep.value, maxStep, canvasRect[curStep.value].lineCnt);
+    click(canvasRect[curStep.value].lineCnt);
+    return;
+  }
+  curStep.value++;
+  maxStep = Math.max(curStep.value, maxStep);
+  console.log(curStep.value, "focus", maxStep);
+  isPreAble.value = true;
+  isNextAble.value = false;
+  preLine = lineCnt;
+  canvasRect[curStep.value] = cloneDeep(canvasRect[curStep.value - 1]);
+  canvasRect[curStep.value].lineCnt = lineCnt;
+  // canvasRect[curStep.value].lineCnt = lineCnt;
+  // console.log(canvasRect);
 }
 function changeCanvas(rectData) {
   const value = rectData.map((item) => toRaw(item));
-  canvasRect[line.value - 1] = value;
+  canvasRect[curStep.value].rect = value;
 }
 function click(line) {
   const lineDom = document.querySelectorAll(".cm-line");
   for (let i = 0; i < lineDom.length; i++) {
     lineDom[i].classList.remove("cm-activeLine");
   }
-  // cntDom[line].classList.add("cm-activeLineGutter");
   if (line <= lineDom.length) lineDom[line - 1].classList.add("cm-activeLine");
 }
 </script>
@@ -62,9 +100,12 @@ export default {
   <div class="container">
     <codeEdit class="code" @focus="focus"></codeEdit>
     <canvasBoard
-      :canvasRect="toRaw(canvasRect[line - 1])"
-      :line="toRaw(line)"
+      :canvasRect="canvasRect[curStep].rect"
+      :curStep="curStep"
+      :isPreAble="isPreAble"
+      :isNextAble="isNextAble"
       @next="next"
+      @pre="pre"
       @change="changeCanvas"
       class="canvas"
       ref="canvas"
