@@ -1,27 +1,38 @@
 <script setup lang="ts">
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
-import BaseBoard from "./BaseBoard.vue";
-import { ref, onMounted, watch, defineEmits, defineProps } from "vue";
-import { diff } from "../utils/tool";
-import { debounce, cloneDeep } from "xijs";
-const rectTypes = ["var", "static"];
-const emit = defineEmits(["next", "change", "pre"]);
+import BaseBoard from './BaseBoard.vue';
+import { ref, onMounted, watch, defineEmits, defineProps, computed } from 'vue';
+import { diff } from '../utils/tool';
+import { debounce, cloneDeep } from 'xijs';
+import { getCurveSvg } from '../utils/math';
+const rectTypes = ['var', 'static'];
+const emit = defineEmits(['next', 'change', 'pre']);
 // 编辑/展示 edit/show
-const status = ref("edit");
+const status = ref('edit');
+interface Arr {
+  isIndex: boolean;
+  value: string;
+  type?: string;
+}
+interface Var {
+  varKey: string;
+  value: string | Array<Array<Arr>>;
+  type: string;
+}
 interface IBaseShapeProp {
   key: string;
   style: any;
   typeName: string;
-  name: string;
-  father: string;
+  name?: string;
+  children?: Var[];
 }
-const typeName = ref("");
-const dragType = ref("");
-const arrayCnt = ref("");
-const defaultName = ref("");
+const typeName = ref('');
+const dragType = ref('');
+const arrayCnt = ref('');
+const defaultName = ref('');
 const boardDom = ref<any>(null);
-const curDblclick = ref("");
+const curDblclick = ref('');
 const cardOffset = ref({
   x: 0,
   y: 0,
@@ -30,28 +41,29 @@ const mouseAbsPos = ref({
   x: 0,
   y: 0,
 });
-const props = defineProps(["canvasRect", "curStep", "isNextAble", "isPreAble"]);
+const props = defineProps(['canvasRect', 'curStep', 'isNextAble', 'isPreAble']);
 function switchVw(raw: string): number {
-  if (raw.includes("vw")) return (innerWidth * parseFloat(raw)) / 100;
-  else if (raw.includes("vh")) return (innerHeight * parseFloat(raw)) / 100;
+  if (raw.includes('vw')) return (innerWidth * parseFloat(raw)) / 100;
+  else if (raw.includes('vh')) return (innerHeight * parseFloat(raw)) / 100;
   else return 0;
 }
 const defaultSize = {
   var: {
-    width: switchVw("5vw"),
-    height: switchVw("5vw"),
+    width: switchVw('5vw'),
+    height: switchVw('5vw'),
   },
   static: {
-    width: switchVw("25vw") + 4,
-    height: switchVw("10vw") + 1,
+    width: switchVw('25vw') + 4,
+    height: switchVw('10vw') + 1,
   },
   array: {
-    width: switchVw("25vw") + 4,
-    height: switchVw("5vw"),
+    width: switchVw('25vw') + 4,
+    height: switchVw('5vw'),
   },
 };
-const curSelect = ref("");
-let curPoint = "";
+const curSelect = ref('');
+let curPoint = '';
+// 起始點
 let templateDot: any[] = [];
 
 const canvasBox = ref<IBaseShapeProp[]>([]);
@@ -70,7 +82,7 @@ const recordManager = ref<any>([
 ]);
 // 弃用
 const handleShapeClick = (name: string) => {
-  if (typeName.value == name) typeName.value = "";
+  if (typeName.value == name) typeName.value = '';
   else typeName.value = name;
 };
 const handleDragStart = (name: string) => {
@@ -84,61 +96,43 @@ const handelDrop = (e: DragEvent) => {
   const { offsetX, offsetY } = e;
   const type = dragType.value;
   let { width, height } = defaultSize[type];
-  if (dragType.value == "array") {
+  if (dragType.value == 'array') {
     const lineCnt = Math.ceil(parseInt(arrayCnt.value) / 5);
     height = height * (lineCnt + 1) + lineCnt;
-    canvasBox.value.push({
-      key: Date.now() + "",
-      style: {
-        left: offsetX - width / 2 + "px",
-        top: offsetY - height / 2 + "px",
-        width: width + "px",
-        height: height + "px",
-      },
-      typeName: "static",
-      name: "static",
-      father: "",
-    });
-    const varSize = switchVw("5vw");
+    const varSize = switchVw('5vw');
     for (let row = 0; row < lineCnt; row++) {
       for (let col = 0; col < 5; col++) {
         if (row * 5 + col > parseInt(arrayCnt.value)) break;
         canvasBox.value.push({
-          key: Date.now() + row * 10 + col + 1 + "",
+          key: Date.now() + row * 10 + col + 1 + '',
           style: {
-            left: offsetX - width / 2 + varSize * col + col + "px",
-            top: offsetY - height / 2 + varSize * row + row * 0.5 + "px",
-            width: varSize + "px",
-            height: varSize + "px",
+            left: offsetX - width / 2 + varSize * col + col + 'px',
+            top: offsetY - height / 2 + varSize * row + row * 0.5 + 'px',
+            width: varSize + 'px',
+            height: varSize + 'px',
           },
-          typeName: "val",
+          typeName: 'val',
           name: defaultName.value,
-          father: "",
         });
       }
     }
   } else {
     canvasBox.value.push({
-      key: Date.now() + "",
+      key: Date.now() + '',
       style: {
-        left: offsetX - width / 2 + "px",
-        top: offsetY - height / 2 + "px",
-        width: width + "px",
-        height: height + "px",
+        left: offsetX - width / 2 + 'px',
+        top: offsetY - height / 2 + 'px',
+        width: width + 'px',
+        height: height + 'px',
       },
       typeName: type,
       name: type,
-      father: "",
     });
   }
 };
 const handleMouseChange = (x: number, y: number) => {
   mouseAbsPos.value = { x, y };
-  if (
-    curSelect.value.length &&
-    templateDot.length &&
-    !curDblclick.value.length
-  ) {
+  if (curSelect.value.length && templateDot.length && !curDblclick.value.length) {
     const [x0, y0] = templateDot;
     canvasBox.value = canvasBox.value.map((v) => {
       templateDot = [x, y];
@@ -150,10 +144,10 @@ const handleMouseChange = (x: number, y: number) => {
         width = parseFloat(width);
         // 如果有选中的点，判断为拉伸元素
         if (curPoint.length) {
-          const hasLeft = curPoint.includes("l");
-          const hasRight = curPoint.includes("r");
-          const hasTop = curPoint.includes("t");
-          const hasBottom = curPoint.includes("b");
+          const hasLeft = curPoint.includes('l');
+          const hasRight = curPoint.includes('r');
+          const hasTop = curPoint.includes('t');
+          const hasBottom = curPoint.includes('b');
           if (hasLeft) {
             left += x - x0;
             width += x0 - x;
@@ -164,14 +158,19 @@ const handleMouseChange = (x: number, y: number) => {
             height += y0 - y;
           }
           if (hasBottom) height += y - y0;
+          if (v.typeName == 'arrow' && curPoint == 'i') {
+            width = x0 - left;
+            height = y0 - top;
+            console.log(width, height);
+          }
           return {
             ...v,
             style: {
               ...v.style,
-              left: left + "px",
-              top: top + "px",
-              height: height + "px",
-              width: width + "px",
+              left: left + 'px',
+              top: top + 'px',
+              height: height + 'px',
+              width: width + 'px',
             },
           };
         }
@@ -181,44 +180,41 @@ const handleMouseChange = (x: number, y: number) => {
             ...v,
             style: {
               ...v.style,
-              left: left + (x - x0) + "px",
-              top: top + (y - y0) + "px",
+              left: left + (x - x0) + 'px',
+              top: top + (y - y0) + 'px',
             },
           };
         }
       }
       return v;
     });
-    showLine();
-  }
-  // 否则则生成元素
-  const [a1, b1, key] = templateDot;
-  if (typeName.value && templateDot.length) {
-    let dx = x - a1;
-    let dy = y - b1;
-    let curIndex = canvasBox.value.findIndex((v) => v.key === key);
-    if (curIndex > -1) {
-      canvasBox.value[curIndex] = {
-        ...canvasBox.value[curIndex],
-        style: {
-          left: (dx > 0 ? a1 : x) + "px",
-          top: (dy > 0 ? b1 : y) + "px",
-          width: Math.abs(dx) + "px",
-          height: Math.abs(dy) + "px",
-        },
-      };
-    }
+    // showLine();
   }
 };
 
 const handleMouseDown = () => {
   const { x, y } = mouseAbsPos.value;
+  if (typeName.value == 'arrow') {
+    const key = Date.now() + '';
+    canvasBox.value.push({
+      key,
+      style: {
+        left: x + 'px',
+        top: y + 'px',
+        width: 0,
+        height: 0,
+      },
+      typeName: 'arrow',
+    });
+    curSelect.value = key;
+    curPoint = 'i';
+  }
   templateDot = [x, y];
-  curPoint = "";
 };
 
 const handleMouseUp = () => {
   templateDot = [];
+  // curPoint = '';
 };
 
 const handleSelected = (key: string) => {
@@ -229,21 +225,21 @@ const handleDblclick = (key: string, e: MouseEvent) => {
   e.preventDefault;
 };
 const handleClearSelect = (e: any) => {
-  if (e.target && e.target.getAttribute("data-key") !== curSelect.value) {
-    curSelect.value = "";
-    curDblclick.value = "";
+  if (e.target && e.target.getAttribute('data-key') !== curSelect.value) {
+    curSelect.value = '';
+    curDblclick.value = '';
   }
   clearLine();
 };
 const handleDel = (key: string) => {
   canvasBox.value = canvasBox.value.filter((v) => v.key !== key);
-  curSelect.value = "";
+  curSelect.value = '';
   templateDot = [];
 };
 
 const handleClear = () => {
   canvasBox.value = [];
-  emit("change", canvasBox.value);
+  emit('change', canvasBox.value);
 };
 
 const undo = () => {
@@ -251,33 +247,25 @@ const undo = () => {
   const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
   if (curIndex === 0) return;
   recordManager.value[props.curStep].curIndex--;
-  canvasBox.value = cloneDeep(
-    recordManager.value[props.curStep].snapshots[
-      recordManager.value[props.curStep].curIndex
-    ]
-  );
-  emit("change", canvasBox.value);
+  canvasBox.value = cloneDeep(recordManager.value[props.curStep].snapshots[recordManager.value[props.curStep].curIndex]);
+  emit('change', canvasBox.value);
 };
 
 const redo = () => {
   // 重做
-  const { snapshots, maxLimit, curIndex } =
-    recordManager.value[props.lincurStepe - 1];
+  const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep - 1];
   if (curIndex >= snapshots.length - 1) {
     return;
   }
   recordManager.value[props.curStep].curIndex++;
-  canvasBox.value =
-    recordManager.value[props.curStep].snapshots[
-      recordManager.value[props.curStep].curIndex
-    ];
-  emit("change", canvasBox.value);
+  canvasBox.value = recordManager.value[props.curStep].snapshots[recordManager.value[props.curStep].curIndex];
+  emit('change', canvasBox.value);
 };
 
 const layerVisible = ref(false);
 
 const toggleLayer = (e: any) => {
-  if (e.target.className.indexOf("toolItem") < 0) return;
+  if (e.target.className.indexOf('toolItem') < 0) return;
   layerVisible.value = !layerVisible.value;
 };
 
@@ -287,7 +275,7 @@ const handleDelItem = (key: string) => {
 
 const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
   const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
-  // 如果两个状态相同, 则不推入历史记录
+  // 如果两个状态相同, 则不推入历史记
   if (!diff(state, snapshots[curIndex])) {
     return;
   }
@@ -301,46 +289,45 @@ const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
   }
 
   recordManager.value[props.curStep].snapshots.push(cloneDeep(state));
-  recordManager.value[props.curStep].curIndex =
-    recordManager.value[props.curStep].snapshots.length - 1;
-  emit("change", canvasBox.value);
+  recordManager.value[props.curStep].curIndex = recordManager.value[props.curStep].snapshots.length - 1;
+  emit('change', canvasBox.value);
 };
 function next() {
-  if (props.isNextAble) emit("next");
+  if (props.isNextAble) emit('next');
 }
 function pre() {
-  if (props.isPreAble) emit("pre");
+  if (props.isPreAble) emit('pre');
 }
 // 拉伸
-const pointList = ["lt", "t", "r", "rb", "b", "lb", "l"];
+const pointList = ['lt', 't', 'r', 'rb', 'b', 'lb', 'l'];
 const cursor = {
   // 每个点对应的初始角度
-  lt: "nw-resize",
-  t: "n-resize",
-  rt: "ne-resize",
-  r: "e-resize",
-  rb: "se-resize",
-  b: "s-resize",
-  lb: "sw-resize",
-  l: "w-resize",
+  lt: 'nw-resize',
+  t: 'n-resize',
+  rt: 'ne-resize',
+  r: 'e-resize',
+  rb: 'se-resize',
+  b: 's-resize',
+  lb: 'sw-resize',
+  l: 'w-resize',
 };
 function getPointList(item: IBaseShapeProp) {
   if (curSelect.value && item.key == curSelect.value) return pointList;
   else return [];
 }
 function getPointStyle(item: string) {
-  const hasLeft = item.includes("l");
-  const hasRight = item.includes("r");
-  const hasTop = item.includes("t");
-  const hasBottom = item.includes("b");
+  const hasLeft = item.includes('l');
+  const hasRight = item.includes('r');
+  const hasTop = item.includes('t');
+  const hasBottom = item.includes('b');
   let left = 0;
   let top = 0;
   let height = 0;
   let width = 0;
   canvasBox.value.forEach((item) => {
     if (item.key == curSelect.value) {
-      height = parseFloat(item.style.height);
-      width = parseFloat(item.style.width);
+      height = parseFloat(item.style.height) + 10;
+      width = parseFloat(item.style.width) + 20;
     }
   });
   if (item.length == 2) {
@@ -357,8 +344,8 @@ function getPointStyle(item: string) {
     }
   }
   return {
-    left: left - 4 + "px",
-    top: top - 4 + "px",
+    left: left - 4 + 'px',
+    top: top - 4 + 'px',
     cursor: cursor[item],
   };
 }
@@ -370,33 +357,33 @@ function handleMouseDownPoint(point: string, event: Event) {
 }
 function handleMouseUpPoint(point: string, event: Event) {
   event.stopPropagation();
-  curPoint = "";
+  curPoint = '';
 }
 // 贴近适应
-let lines = ref(["xt", "xb", "yl", "yr"]);
+let lines = ref(['xt', 'xb', 'yl', 'yr']);
 let lineStatus = ref({
   xt: {
     status: false,
     value: {
-      top: "",
+      top: '',
     },
   },
   xb: {
     status: false,
     value: {
-      top: "",
+      top: '',
     },
   },
   yl: {
     status: false,
     value: {
-      left: "",
+      left: '',
     },
   },
   yr: {
     status: false,
     value: {
-      left: "",
+      left: '',
     },
   },
 });
@@ -419,91 +406,45 @@ function showLine() {
             const conditions = [
               {
                 // yll就是只y方向的线，选中的元素左边与场上的元素的左边对齐了
-                type: "yll",
-                isNear: isNear(
-                  parseFloat(item.style.left),
-                  parseFloat(currentItem.style.left)
-                ),
+                type: 'yll',
+                isNear: isNear(parseFloat(item.style.left), parseFloat(currentItem.style.left)),
                 value: parseFloat(item.style.left),
               },
               {
                 // 选中的左边与场上的右边
-                type: "ylr",
-                isNear: isNear(
-                  parseFloat(item.style.left) + parseFloat(item.style.width),
-                  parseFloat(currentItem.style.left)
-                ),
-                value:
-                  parseFloat(item.style.left) +
-                  parseFloat(item.style.width) +
-                  1,
+                type: 'ylr',
+                isNear: isNear(parseFloat(item.style.left) + parseFloat(item.style.width), parseFloat(currentItem.style.left)),
+                value: parseFloat(item.style.left) + parseFloat(item.style.width) + 1,
               },
               {
-                type: "yrl",
-                isNear: isNear(
-                  parseFloat(item.style.left),
-                  parseFloat(currentItem.style.left) +
-                    parseFloat(currentItem.style.width)
-                ),
-                value:
-                  parseFloat(item.style.left) -
-                  parseFloat(currentItem.style.width) -
-                  1.5,
+                type: 'yrl',
+                isNear: isNear(parseFloat(item.style.left), parseFloat(currentItem.style.left) + parseFloat(currentItem.style.width)),
+                value: parseFloat(item.style.left) - parseFloat(currentItem.style.width) - 1.5,
               },
               {
-                type: "yrr",
-                isNear: isNear(
-                  parseFloat(item.style.left) + parseFloat(item.style.width),
-                  parseFloat(currentItem.style.left) +
-                    parseFloat(currentItem.style.width)
-                ),
-                value:
-                  parseFloat(item.style.left) +
-                  parseFloat(item.style.width) -
-                  parseFloat(currentItem.style.width),
+                type: 'yrr',
+                isNear: isNear(parseFloat(item.style.left) + parseFloat(item.style.width), parseFloat(currentItem.style.left) + parseFloat(currentItem.style.width)),
+                value: parseFloat(item.style.left) + parseFloat(item.style.width) - parseFloat(currentItem.style.width),
               },
               {
-                type: "xtt",
-                isNear: isNear(
-                  parseFloat(item.style.top),
-                  parseFloat(currentItem.style.top)
-                ),
+                type: 'xtt',
+                isNear: isNear(parseFloat(item.style.top), parseFloat(currentItem.style.top)),
                 value: parseFloat(item.style.top),
               },
               {
-                type: "xtb",
-                isNear: isNear(
-                  parseFloat(item.style.top) + parseFloat(item.style.height),
-                  parseFloat(currentItem.style.top)
-                ),
-                value:
-                  parseFloat(item.style.top) +
-                  parseFloat(item.style.height) +
-                  1.5,
+                type: 'xtb',
+                isNear: isNear(parseFloat(item.style.top) + parseFloat(item.style.height), parseFloat(currentItem.style.top)),
+                value: parseFloat(item.style.top) + parseFloat(item.style.height) + 1.5,
               },
               {
-                type: "xbt",
-                isNear: isNear(
-                  parseFloat(item.style.top),
-                  parseFloat(currentItem.style.top) +
-                    parseFloat(currentItem.style.height)
-                ),
-                value:
-                  parseFloat(item.style.top) -
-                  parseFloat(currentItem.style.height) -
-                  1,
+                type: 'xbt',
+                isNear: isNear(parseFloat(item.style.top), parseFloat(currentItem.style.top) + parseFloat(currentItem.style.height)),
+                value: parseFloat(item.style.top) - parseFloat(currentItem.style.height) - 1,
               },
               {
-                type: "xbb",
-                isNear: isNear(
-                  parseFloat(item.style.top) + parseFloat(item.style.height),
-                  parseFloat(currentItem.style.top) +
-                    parseFloat(currentItem.style.height)
-                ),
-                value:
-                  parseFloat(item.style.top) +
-                  parseFloat(item.style.height) -
-                  parseFloat(currentItem.style.height),
+                type: 'xbb',
+                isNear: isNear(parseFloat(item.style.top) + parseFloat(item.style.height), parseFloat(currentItem.style.top) + parseFloat(currentItem.style.height)),
+                value: parseFloat(item.style.top) + parseFloat(item.style.height) - parseFloat(currentItem.style.height),
               },
             ];
             conditions.forEach((condition) => {
@@ -511,12 +452,12 @@ function showLine() {
                 lineCnt.set(item.key, lineCnt.get(item.key) + 1);
                 const type = condition.type;
                 if (/(xt|xb)/.test(type)) {
-                  currentItem.style.top = condition.value + "px";
+                  currentItem.style.top = condition.value + 'px';
                   if (/xt/.test(type)) {
                     lineStatus.value.xt = {
                       status: true,
                       value: {
-                        top: condition.value + "px",
+                        top: condition.value + 'px',
                       },
                     };
                   }
@@ -524,22 +465,18 @@ function showLine() {
                     lineStatus.value.xb = {
                       status: true,
                       value: {
-                        top:
-                          condition.value +
-                          parseFloat(currentItem.style.height) +
-                          1 +
-                          "px",
+                        top: condition.value + parseFloat(currentItem.style.height) + 1 + 'px',
                       },
                     };
                   }
                 }
                 if (/(yl|yr)/.test(type)) {
-                  currentItem.style.left = condition.value + "px";
+                  currentItem.style.left = condition.value + 'px';
                   if (/yl/.test(type)) {
                     lineStatus.value.yl = {
                       status: true,
                       value: {
-                        left: condition.value + "px",
+                        left: condition.value + 'px',
                       },
                     };
                   }
@@ -547,11 +484,7 @@ function showLine() {
                     lineStatus.value.yr = {
                       status: true,
                       value: {
-                        left:
-                          condition.value +
-                          parseFloat(currentItem.style.width) +
-                          1.5 +
-                          "px",
+                        left: condition.value + parseFloat(currentItem.style.width) + 1.5 + 'px',
                       },
                     };
                   }
@@ -574,11 +507,35 @@ function isNear(value1: number, value2: number) {
 function handleChangeItemName(key: string, e: Event) {
   canvasBox.value.map((item) => {
     if (item.key == key) {
-      item.name = e.target.innerText;
+      item.name = e.target?.innerText;
     }
   });
-  emit("change", canvasBox.value);
+  emit('change', canvasBox.value);
 }
+// 添加变量
+function addVar(key: string) {
+  canvasBox.value.some((item) => {
+    if (item.key == key) {
+      if (!item.children)
+        item.children = [
+          {
+            key: 'var',
+            value: 'null',
+            type: 'null',
+          },
+        ];
+      else
+        item.children.push({
+          key: 'var',
+          value: 'null',
+          type: 'null',
+        });
+    }
+  });
+}
+const svgArr = computed(() => {
+  return canvasBox.value.filter((item) => item.typeName == 'arrow');
+});
 watch(canvasBox, debounce(pushRecordFn, 300), { deep: true });
 watch(
   () => props.canvasRect,
@@ -612,108 +569,103 @@ onMounted(() => {
   const { offsetTop, offsetLeft } = board;
   cardOffset.value.x = offsetLeft;
   cardOffset.value.y = offsetTop;
-  board.addEventListener("mousedown", handleMouseDown, false);
-  board.addEventListener("mouseup", handleMouseUp, false);
+  board.addEventListener('mousedown', handleMouseDown, false);
+  board.addEventListener('mouseup', handleMouseUp, false);
 });
 </script>
 
 <template>
   <div class="canvaWrap" @click="handleClearSelect">
-    <BaseBoard
-      msg="几何画板"
-      ref="boardDom"
-      :onMouseChange="handleMouseChange"
-      @dragover="handelDragover"
-      @drop="handelDrop"
-    >
-      <div class="static-area">栈区</div>
+    <BaseBoard msg="几何画板" ref="boardDom" :onMouseChange="handleMouseChange" @dragover="handelDragover" @drop="handelDrop">
+      <!-- <div class="static-area">栈区</div>
       <div class="heap">堆区</div>
-      <div class="show">展示区</div>
+      <div class="show">展示区</div> -->
       <div class="shapeWrap">
-        <div
-          v-for="item in canvasBox"
-          :key="item.key"
-          :class="['shape', 'rect', curSelect == item.key ? 'active' : '']"
-          :style="{
-            left: item.style.left,
-            top: item.style.top,
-            width: item.style.width,
-            lineHeight: item.style.height,
-            zIndex: item.typeName == 'var' ? 2 : 1,
-          }"
-          :data-key="item.key"
-        >
-          <img
-            src="../../public//delete.svg"
-            v-if="curSelect === item.key"
-            @click="handleDel(item.key)"
-            class="delete"
-          />
-          <span
-            v-for="point in getPointList(item)"
-            :key="point"
-            :style="getPointStyle(point)"
-            @mousedown="handleMouseDownPoint(point, $event)"
-            @mouseup="handleMouseUpPoint(point, $event)"
-            class="point"
-          ></span>
+        <svg class="svg">
+          <defs>
+            <marker id="dot" markerUnits="strokeWidth" markerWidth="6" markerHeight="6">
+              <circle cx="3" cy="3" r="3" />
+            </marker>
+            <marker id="triangle" markerUnits="strokeWidth" markerWidth="10" markerHeight="8" refX="0" refY="4" orient="auto">
+              <path d="M 0 0 L 10 4 L 0 8 z" fill="#005583" />
+            </marker>
+          </defs>
+          <path v-for="item in svgArr" :key="item.key" :d="getCurveSvg(item.style)" fill="none" stroke="#005583" stroke-width="1" style="marker-end: url(#triangle); marker-start: url(#dot)"></path>
+        </svg>
+        <div v-for="item in canvasBox" :key="item.key">
           <div
-            class="content"
-            @dblclick="handleDblclick(item.key, $event)"
-            :contenteditable="curDblclick == item.key ? 'true' : 'false'"
+            v-if="item.typeName != 'arrow'"
+            :class="['shape', 'rect', curSelect == item.key ? 'active' : '']"
+            :style="{
+              left: item.style.left,
+              top: item.style.top,
+              width: item.style.width,
+              height: item.style.height,
+              zIndex: item.typeName == 'var' ? 2 : 1,
+            }"
             :data-key="item.key"
             @mousedown="handleSelected(item.key)"
-            @blur="handleChangeItemName(item.key, $event)"
-            :style="{ cursor: curDblclick == item.key ? 'text' : '' }"
           >
-            {{ item.name }}
+            <div
+              class="content"
+              @dblclick="handleDblclick(item.key, $event)"
+              :contenteditable="curDblclick == item.key ? 'true' : 'false'"
+              :data-key="item.key"
+              @blur="handleChangeItemName(item.key, $event)"
+              :style="{ cursor: curDblclick == item.key ? 'text' : '' }"
+            >
+              {{ item.name }}
+            </div>
+            <img src="../../public/delete.svg" v-if="curSelect === item.key" @click="handleDel(item.key)" class="delete" />
+            <span
+              v-for="point in getPointList(item)"
+              :key="point"
+              :style="getPointStyle(point)"
+              @mousedown="handleMouseDownPoint(point, $event)"
+              @mouseup="handleMouseUpPoint(point, $event)"
+              class="point"
+            ></span>
+            <table>
+              <tr v-for="child in item.children" :key="child.key">
+                <td class="stackFrameVar" :contenteditable="true">{{ child.varKey }}</td>
+                <td class="stackFrameValue">
+                  <div class="typeLabel" :contenteditable="true">{{ child.type }}</div>
+                  <div v-if="typeof child.value == 'string'" class="cdataElt" :contenteditable="true">{{ child.value }}</div>
+                  <table v-else class="cArrayTbl">
+                    <tr v-for="(item, index) in child.value" :key="index">
+                      <td v-for="(val, index) in item" :key="index" class="cMultidimArrayHeader">
+                        <span v-if="val.isIndex">{{ val.value }}</span>
+                        <div v-else>
+                          <div class="typeLabel">{{ val.type }}</div>
+                          <div class="cdataElt">{{ val.value }}</div>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+            <button @mousedown.stop="" @click.prevent="addVar(item.key)">添加变量</button>
           </div>
         </div>
         <div class="mark-line">
-          <div
-            v-for="line in lines"
-            v-show="lineStatus[line].status"
-            :key="line"
-            :ref="line"
-            class="line"
-            :class="line.includes('x') ? 'xline' : 'yline'"
-            :style="lineStatus[line].value"
-          ></div>
+          <div v-for="line in lines" v-show="lineStatus[line].status" :key="line" :ref="line" class="line" :class="line.includes('x') ? 'xline' : 'yline'" :style="lineStatus[line].value"></div>
         </div>
       </div>
     </BaseBoard>
     <div class="toolbar">
-      <div
-        :class="['toolItem', 'rect']"
-        v-for="item in rectTypes"
-        :key="item"
-        draggable="true"
-        @dragstart="handleDragStart(item)"
-      >
+      <div :class="['toolItem', 'rect']" v-for="item in rectTypes" :key="item" draggable="true" @dragstart="handleDragStart(item)">
         <span>{{ item }}</span>
       </div>
-      <div
-        :class="[
-          'toolItem',
-          'rect',
-          'array',
-          typeName == 'array' ? 'active' : '',
-        ]"
-      >
-        <span
-          @click="handleShapeClick('array')"
-          :draggable="typeName == 'array'"
-          @dragstart="handleDragStart('array')"
-          >array</span
-        >
+      <div :class="['toolItem', 'rect', 'array', typeName == 'array' ? 'active' : '']">
+        <span @click="handleShapeClick('array')" :draggable="typeName == 'array'" @dragstart="handleDragStart('array')">array</span>
         <div v-if="typeName == 'array'">
           <input v-model="arrayCnt" placeholder="变量数" @click.stop="null" />
-          <input
-            v-model="defaultName"
-            placeholder="默认值"
-            @click.stop="null"
-          />
+          <input v-model="defaultName" placeholder="默认值" @click.stop="null" />
         </div>
+      </div>
+      <div :class="['toolItem', 'rect', 'array', typeName == 'arrow' ? 'active' : '']" @click="handleShapeClick('arrow')">
+        <span>arrow</span>
       </div>
       <div class="toolItem" :class="['toolItem']" @click="undo">
         <span>撤销</span>
@@ -737,7 +689,7 @@ onMounted(() => {
 .canvaWrap {
   position: relative;
   user-select: none;
-  text-align: center;
+  // text-align: center;
   //   color: @primary;
   .toolbar {
     position: absolute;
@@ -814,15 +766,24 @@ onMounted(() => {
   }
   .shapeWrap {
     height: 80vh;
+    .svg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 80vw;
+      height: 80vh;
+    }
     .shape {
       // position: relative;
       border: 1px solid rgba(0, 0, 0);
       background-color: transparent;
       z-index: 1;
-      position: absolute;
+      position: relative;
       cursor: move;
       background-color: #fff;
       user-select: none;
+      padding-top: 10px;
+      padding-left: 20px;
       .type {
         user-select: none;
         position: absolute;
@@ -838,10 +799,6 @@ onMounted(() => {
         height: 8px;
         border-radius: 50%;
         z-index: 2;
-      }
-      .content {
-        width: 100%;
-        height: 100%;
       }
       &.active {
         span {
@@ -859,7 +816,57 @@ onMounted(() => {
           line-height: 12px;
           width: 12px;
           cursor: pointer;
-          text-align: center;
+          // text-align: center;
+        }
+      }
+      tr {
+        vertical-align: middle;
+        display: table-row;
+        .stackFrameVar {
+          text-align: right;
+          padding-right: 8px;
+          padding-top: 3px;
+          padding-bottom: 3px;
+        }
+        .stackFrameValue {
+          text-align: left;
+          border-bottom: 1px solid #aaaaaa;
+          border-left: 1px solid #aaaaaa;
+          vertical-align: middle;
+          padding-top: 3px;
+          padding-left: 3px;
+          padding-bottom: 3px;
+          .typeLabel {
+            font-size: 10pt;
+            position: relative;
+          }
+          .cdataElt {
+            font-size: 10pt;
+            position: relative;
+          }
+          .cArrayTbl {
+            background-color: #ffffc6;
+            padding-left: 0px;
+            padding-top: 0px;
+            padding-bottom: 0px;
+            font-size: 8pt;
+            color: #777;
+            text-align: left;
+            border: 0px solid black;
+            border-spacing: 0px;
+            .cMultidimArrayHeader {
+              padding-left: 5px;
+              padding-right: 5px;
+              padding-top: 1px;
+              padding-bottom: 3px;
+              font-size: 6pt;
+              color: #777;
+              text-align: left;
+              border-top: 1px solid #888;
+              border-left: 1px solid #888;
+              border-bottom: 0px solid black;
+            }
+          }
         }
       }
     }

@@ -58,39 +58,7 @@ const generateRectangleMeta = (startPos: [number, number], w: number, h: number)
     }
   };
   
-  const generateLinesMeta = (pos: [number, number][], isLine: boolean = false) => {
-    if (pos && Array.isArray(pos) && pos.length >= 2) {
-      let i = 0,
-        len = pos.length,
-        result = [];
-      while (i < len) {
-        if (isLine && !pos[i + 1]) {
-          break;
-        }
-        let A = pos[i];
-        let B = pos[i + 1 > len - 1 ? 0 : i + 1];
-        if (A[0] > B[0]) {
-          [B, A] = [A, B];
-        }
-        const dx = B[0] - A[0];
-        const dy = B[1] - A[1];
-        const l = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
-        const tanAB = dy / dx;
-        const AB = (Math.atan(tanAB) * 180) / Math.PI;
-        result.push({
-          startPos: A,
-          endPos: B,
-          angle: AB,
-          l,
-        });
-        i++;
-      }
-  
-      return result;
-    } else {
-      throw new Error("Please pass in the correct parameters");
-    }
-  };
+
 
   // 获取元素的绝对位置坐标（像对于页面左上角）
 const getElPagePos = (element: HTMLElement) => {
@@ -107,10 +75,18 @@ const getElPagePos = (element: HTMLElement) => {
     return {x: actualLeft, y: actualTop}
   }
 
+  export function getCurveSvg(style:any):string {
+    let {height,width,left,top} = style
+    height = parseFloat(height)
+    width = parseFloat(width)
+    left = parseFloat(left)
+    top = parseFloat(top)
+    return `M ${left-3} ${top-3} M ${left} ${top} q ${width * 0.7} ${height * 0.3} ${width} ${height}`
+  }
+  
   export {
     generateRectangleMeta,
     generateCircleMeta,
     generateLineMeta,
-    generateLinesMeta,
     getElPagePos
   }
