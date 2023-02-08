@@ -3,10 +3,13 @@
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import BaseBoard from './BaseBoard.vue';
 import { ref, onMounted, watch, defineEmits, defineProps, computed } from 'vue';
+import { ElMessageBox } from 'element-plus';
 import { diff } from '../utils/tool';
 import { debounce, cloneDeep } from 'xijs';
 import { getCurveSvg } from '../utils/math';
-const rectTypes = ['var', 'static'];
+import { off } from 'process';
+import { fa } from 'element-plus/es/locale';
+const rectTypes = ['var', 'stack'];
 const emit = defineEmits(['next', 'change', 'pre']);
 // 编辑/展示 edit/show
 const status = ref('edit');
@@ -14,11 +17,13 @@ interface Arr {
   isIndex: boolean;
   value: string;
   type?: string;
+  key: string;
 }
 interface Var {
   varKey: string;
   value: string | Array<Array<Arr>>;
   type: string;
+  key: string;
 }
 interface IBaseShapeProp {
   key: string;
@@ -52,7 +57,7 @@ const defaultSize = {
     width: switchVw('5vw'),
     height: switchVw('5vw'),
   },
-  static: {
+  stack: {
     width: switchVw('25vw') + 4,
     height: switchVw('10vw') + 1,
   },
@@ -214,7 +219,7 @@ const handleMouseDown = () => {
 
 const handleMouseUp = () => {
   templateDot = [];
-  // curPoint = '';
+  curPoint = '';
 };
 
 const handleSelected = (key: string) => {
@@ -253,7 +258,7 @@ const undo = () => {
 
 const redo = () => {
   // 重做
-  const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep - 1];
+  const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
   if (curIndex >= snapshots.length - 1) {
     return;
   }
@@ -274,6 +279,7 @@ const handleDelItem = (key: string) => {
 };
 
 const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
+  console.log('push', state);
   const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
   // 如果两个状态相同, 则不推入历史记
   if (!diff(state, snapshots[curIndex])) {
@@ -504,13 +510,74 @@ function isNear(value1: number, value2: number) {
   return Math.abs(value1 - value2) < 8;
 }
 // 编辑变量双向绑定
-function handleChangeItemName(key: string, e: Event) {
-  canvasBox.value.map((item) => {
-    if (item.key == key) {
-      item.name = e.target?.innerText;
+function handleChangeItemName(key: string, prop, e: Event) {
+  const obj = findObj(key);
+  if (obj) {
+    obj[prop] = e.target?.innerText;
+    emit('change', canvasBox.value);
+  }
+}
+// 数组初始化设置的dialog
+let arrDialogVisible = ref(false);
+let arrDialogType = ref('int');
+let arrDialogCnt = ref(1);
+let arrDialogValue = ref('?');
+// 用于储存点击元素的key
+let key = ref('');
+function openDialog(keyVal) {
+  arrDialogVisible.value = true;
+  key.value = keyVal;
+}
+// 更改值为arr
+function createArr() {
+  console.log(key.value);
+  const obj = findObj(key.value);
+  if (!obj) return;
+  obj.type = 'array';
+  // 10个一行
+  let length = Math.floor(arrDialogCnt.value / 10) * 2;
+  console.log(length, 'length');
+  let value = new Array(length).fill([0]).map(() => new Array(10).fill(0));
+  const leftLength = arrDialogCnt.value % 10;
+  value.push(new Array(leftLength).fill(0));
+  value.push(new Array(leftLength).fill(0));
+  for (let i = 0; i < value.length; i++) {
+    for (let j = 0; j < value[i].length; j++) {
+      if (i % 2 == 0) {
+        value[i][j] = {
+          isIndex: true,
+          value: i * 10 + j,
+          key: obj.key + i + j,
+        };
+      } else {
+        value[i][j] = {
+          isIndex: false,
+          type: arrDialogType.value,
+          value: arrDialogValue.value,
+          key: obj.key + i + j,
+        };
+      }
     }
-  });
-  emit('change', canvasBox.value);
+  }
+  obj.value = value;
+  console.log(obj.value, 'val');
+}
+function findObj(key) {
+  let stk: Array<any> = [canvasBox.value];
+  while (stk.length) {
+    const arr = stk.shift();
+    if (!arr) return null;
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].key == key) {
+        return arr[i];
+      } else {
+        if (arr[i].children) {
+          stk.push(arr[i].children);
+        }
+      }
+    }
+  }
+  return null;
 }
 // 添加变量
 function addVar(key: string) {
@@ -519,16 +586,18 @@ function addVar(key: string) {
       if (!item.children)
         item.children = [
           {
-            key: 'var',
-            value: 'null',
-            type: 'null',
+            varKey: 'var',
+            value: '?',
+            type: 'int',
+            key: item.key + 0,
           },
         ];
       else
         item.children.push({
-          key: 'var',
-          value: 'null',
-          type: 'null',
+          varKey: 'var',
+          value: '?',
+          type: 'int',
+          key: item.key + item.children.length,
         });
     }
   });
@@ -581,17 +650,6 @@ onMounted(() => {
       <div class="heap">堆区</div>
       <div class="show">展示区</div> -->
       <div class="shapeWrap">
-        <svg class="svg">
-          <defs>
-            <marker id="dot" markerUnits="strokeWidth" markerWidth="6" markerHeight="6">
-              <circle cx="3" cy="3" r="3" />
-            </marker>
-            <marker id="triangle" markerUnits="strokeWidth" markerWidth="10" markerHeight="8" refX="0" refY="4" orient="auto">
-              <path d="M 0 0 L 10 4 L 0 8 z" fill="#005583" />
-            </marker>
-          </defs>
-          <path v-for="item in svgArr" :key="item.key" :d="getCurveSvg(item.style)" fill="none" stroke="#005583" stroke-width="1" style="marker-end: url(#triangle); marker-start: url(#dot)"></path>
-        </svg>
         <div v-for="item in canvasBox" :key="item.key">
           <div
             v-if="item.typeName != 'arrow'"
@@ -609,9 +667,9 @@ onMounted(() => {
             <div
               class="content"
               @dblclick="handleDblclick(item.key, $event)"
-              :contenteditable="curDblclick == item.key ? 'true' : 'false'"
+              @blur="handleChangeItemName(item.key, 'name', $event)"
+              contenteditable
               :data-key="item.key"
-              @blur="handleChangeItemName(item.key, $event)"
               :style="{ cursor: curDblclick == item.key ? 'text' : '' }"
             >
               {{ item.name }}
@@ -627,27 +685,48 @@ onMounted(() => {
             ></span>
             <table>
               <tr v-for="child in item.children" :key="child.key">
-                <td class="stackFrameVar" :contenteditable="true">{{ child.varKey }}</td>
+                <td class="stackFrameVar" @blur="handleChangeItemName(child.key, 'varKey', $event)" contenteditable>{{ child.varKey }}</td>
                 <td class="stackFrameValue">
-                  <div class="typeLabel" :contenteditable="true">{{ child.type }}</div>
-                  <div v-if="typeof child.value == 'string'" class="cdataElt" :contenteditable="true">{{ child.value }}</div>
+                  <div class="typeLabel" @blur="handleChangeItemName(child.key, 'type', $event)" contenteditable>{{ child.type }}</div>
+                  <div v-if="typeof child.value == 'string'" class="cdataElt" @blur="handleChangeItemName(child.key, 'value', $event)" contenteditable>{{ child.value }}</div>
                   <table v-else class="cArrayTbl">
                     <tr v-for="(item, index) in child.value" :key="index">
-                      <td v-for="(val, index) in item" :key="index" class="cMultidimArrayHeader">
-                        <span v-if="val.isIndex">{{ val.value }}</span>
-                        <div v-else>
+                      <td class="td" v-for="(val, index) in item" :key="index">
+                        <span class="cArrayHeader" v-if="val.isIndex">{{ val.value }}</span>
+                        <div class="cArrayElt" v-else>
                           <div class="typeLabel">{{ val.type }}</div>
                           <div class="cdataElt">{{ val.value }}</div>
                         </div>
                       </td>
                     </tr>
                   </table>
+                  <el-button @click="openDialog(child.key)" plain type="primary">设为数组</el-button>
                 </td>
               </tr>
             </table>
-            <button @mousedown.stop="" @click.prevent="addVar(item.key)">添加变量</button>
+            <el-button plain type="primary" @mousedown.stop="" @click.prevent="addVar(item.key)">添加变量</el-button>
           </div>
         </div>
+        <svg class="svg">
+          <defs>
+            <marker id="dot" markerUnits="strokeWidth" markerWidth="6" markerHeight="6">
+              <circle cx="3" cy="3" r="3" />
+            </marker>
+            <marker id="triangle" markerUnits="strokeWidth" markerWidth="10" markerHeight="8" refX="0" refY="4" orient="auto">
+              <path d="M 0 0 L 10 4 L 0 8 z" fill="#005583" />
+            </marker>
+          </defs>
+          <path
+            class="arrow"
+            v-for="item in svgArr"
+            :key="item.key"
+            :d="getCurveSvg(item.style)"
+            fill="none"
+            stroke="#005583"
+            stroke-width="1"
+            style="marker-end: url(#triangle); marker-start: url(#dot)"
+          ></path>
+        </svg>
         <div class="mark-line">
           <div v-for="line in lines" v-show="lineStatus[line].status" :key="line" :ref="line" class="line" :class="line.includes('x') ? 'xline' : 'yline'" :style="lineStatus[line].value"></div>
         </div>
@@ -682,6 +761,15 @@ onMounted(() => {
     </div>
     <div :class="['pre', isPreAble ? 'able' : '']" @click="pre">pre</div>
     <div :class="['next', isNextAble ? 'able' : '']" @click="next">next</div>
+    <el-dialog width="30%" v-model="arrDialogVisible">
+      变量类型：<el-input v-model="arrDialogType"></el-input> 变量个数：<el-input v-model="arrDialogCnt"></el-input> 变量初始值：<el-input v-model="arrDialogValue"></el-input>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="arrDialogVisible = false">Cancel</el-button>
+          <el-button type="primary" @click="createArr"> Confirm </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -768,6 +856,7 @@ onMounted(() => {
     height: 80vh;
     .svg {
       position: absolute;
+      z-index: auto;
       left: 0;
       top: 0;
       width: 80vw;
@@ -798,7 +887,6 @@ onMounted(() => {
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        z-index: 2;
       }
       &.active {
         span {
@@ -854,17 +942,29 @@ onMounted(() => {
             text-align: left;
             border: 0px solid black;
             border-spacing: 0px;
-            .cMultidimArrayHeader {
-              padding-left: 5px;
-              padding-right: 5px;
-              padding-top: 1px;
-              padding-bottom: 3px;
-              font-size: 6pt;
-              color: #777;
-              text-align: left;
-              border-top: 1px solid #888;
-              border-left: 1px solid #888;
-              border-bottom: 0px solid black;
+            .td {
+              text-align: center;
+              padding: 0;
+              .cMultidimArrayHeader {
+                padding-left: 5px;
+                padding-top: 0px;
+                padding-bottom: 2px;
+                font-size: 6pt;
+                color: #777;
+                border-bottom: 0px solid black;
+              }
+              .cArrayElt {
+                border-bottom: 1px solid #888;
+                border-left: 1px solid #888;
+                border-top: 0px solid black;
+                color: black;
+                padding-top: 2px;
+                padding-bottom: 4px;
+                padding-left: 5px;
+                padding-right: 4px;
+                vertical-align: top;
+                position: relative;
+              }
             }
           }
         }
@@ -946,6 +1046,10 @@ onMounted(() => {
   .yline {
     width: 0.5px;
     height: 100%;
+  }
+  .arrow {
+    position: absolute;
+    z-index: 3;
   }
 }
 </style>
