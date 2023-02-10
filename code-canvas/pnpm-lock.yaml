@@ -6,6 +6,7 @@ specifiers:
   '@codemirror/lang-javascript': ^6.1.1
   '@codemirror/state': ^6.1.4
   '@codemirror/theme-one-dark': ^6.1.0
+  '@element-plus/icons-vue': ^2.0.10
   '@vitejs/plugin-vue': ^3.2.0
   codemirror: ^6.0.1
   dom-to-image: ^2.6.0
@@ -25,6 +26,7 @@ dependencies:
   '@codemirror/lang-javascript': 6.1.1
   '@codemirror/state': 6.1.4
   '@codemirror/theme-one-dark': 6.1.0
+  '@element-plus/icons-vue': 2.0.10_vue@3.2.45
   codemirror: 6.0.1
   dom-to-image: 2.6.0
   element-plus: 2.2.29_vue@3.2.45

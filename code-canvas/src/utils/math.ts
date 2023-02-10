@@ -83,7 +83,14 @@ const getElPagePos = (element: HTMLElement) => {
     top = parseFloat(top)
     return `M ${left-3} ${top-3} M ${left} ${top} q ${width * 0.7} ${height * 0.3} ${width} ${height}`
   }
-  
+  export function getDeleteSvg(style:any):string {
+    let {height,width,left,top} = style
+    height = parseFloat(height)
+    width = parseFloat(width)
+    left = parseFloat(left)
+    top = parseFloat(top)
+    return `M ${left+7} ${top-3} l 6 6 M ${left+7} ${top+3} l 6 -6`
+  }
   export {
     generateRectangleMeta,
     generateCircleMeta,
