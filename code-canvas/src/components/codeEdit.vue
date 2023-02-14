@@ -1,22 +1,15 @@
 <script setup>
-import {
-  ref,
-  shallowRef,
-  defineProps,
-  defineEmits,
-  computed,
-  onMounted,
-} from "vue";
-import { Codemirror } from "vue-codemirror";
-import { javascript } from "@codemirror/lang-javascript";
-import { java } from "@codemirror/lang-java";
-import { cpp } from "@codemirror/lang-cpp";
-import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorState, EditorSelection } from "@codemirror/state";
+import { ref, shallowRef, defineProps, defineEmits, computed, onMounted } from 'vue';
+import { Codemirror } from 'vue-codemirror';
+import { javascript } from '@codemirror/lang-javascript';
+import { java } from '@codemirror/lang-java';
+import { cpp } from '@codemirror/lang-cpp';
+import { oneDark } from '@codemirror/theme-one-dark';
+import { EditorState, EditorSelection } from '@codemirror/state';
 const code = ref(`int main({
   
 })`);
-const emit = defineEmits(["focus"]);
+const emit = defineEmits(['focus']);
 const extensions = [cpp()];
 // Codemirror EditorView instance ref
 const view = shallowRef();
@@ -36,7 +29,7 @@ const getCodemirrorStates = () => {
   // return ...
 };
 function change(e) {
-  emit("focus", getLine(e.state.selection.main.from, e.state.doc.text));
+  emit('focus', getLine(e.state.selection.main.from, e.state.doc.text));
 }
 function getLine(cnt, text) {
   let temp = cnt + 1;
@@ -49,7 +42,7 @@ function getLine(cnt, text) {
 }
 const input = ref(null);
 onMounted(() => {
-  input.value.addEventListener("change", () => {
+  input.value.addEventListener('change', () => {
     const reader = new FileReader();
     reader.readAsText(input.value.files[0]);
     reader.onload = () => {
@@ -61,9 +54,12 @@ onMounted(() => {
 <template>
   <div>
     <div class="topblank"></div>
-    <div class="input">
-      <label for="input">选择文件</label>
-      <input id="input" type="file" ref="input" />
+    <div class="top-container">
+      <div class="input">
+        <label for="input">选择文件</label>
+        <input id="input" type="file" ref="input" />
+      </div>
+      <el-button plain type="primary">保存</el-button>
     </div>
     <div class="code-container">
       <div class="leftblank"></div>
@@ -88,23 +84,27 @@ onMounted(() => {
   </div>
 </template>
 <style lang="less">
+.top-container {
+  margin-top: 5vh;
+  display: flex;
+  justify-content: space-around;
+  .input {
+    line-height: 3vh;
+    margin-bottom: 2vh;
+    label {
+      margin-left: 5vw;
+      background: linear-gradient(to bottom, #eee, #ccc);
+      padding: 5px;
+    }
+    #input {
+      display: none;
+    }
+  }
+}
 .code-container {
   display: flex;
 }
 .code-content {
   background-color: #fff;
-}
-.input {
-  margin-top: 5vh;
-  line-height: 3vh;
-  margin-bottom: 2vh;
-  label {
-    margin-left: 5vw;
-    background: linear-gradient(to bottom, #eee, #ccc);
-    padding: 5px;
-  }
-  #input {
-    display: none;
-  }
 }
 </style>

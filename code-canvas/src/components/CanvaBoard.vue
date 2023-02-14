@@ -4,10 +4,12 @@
 import BaseBoard from './BaseBoard.vue';
 import { ref, onMounted, watch, defineEmits, defineProps, computed } from 'vue';
 import { Close } from '@element-plus/icons-vue';
+import { ElMessageBox } from 'element-plus';
+import 'element-plus/theme-chalk/index.css';
 import { diff } from '../utils/tool';
 import { debounce, cloneDeep } from 'xijs';
 import { getCurveSvg, getDeleteSvg } from '../utils/math';
-const rectTypes = ['stack'];
+const rectTypes = ['memorySpace'];
 const emit = defineEmits(['next', 'change', 'pre']);
 // 编辑/展示 edit/show
 const status = ref('edit');
@@ -55,7 +57,7 @@ const defaultSize = {
     width: switchVw('5vw'),
     height: switchVw('5vw'),
   },
-  stack: {
+  memorySpace: {
     width: switchVw('25vw') + 4,
     height: switchVw('10vw') + 1,
   },
@@ -533,7 +535,7 @@ function openDialog(keyVal) {
 }
 function deleteArrow(key) {
   const idx = canvasBox.value.findIndex((item) => item.key == key);
-  canvasBox.value.splice(idx,1)
+  canvasBox.value.splice(idx, 1);
 }
 // 删除变量
 function deleteVar(arr, idx) {
@@ -571,6 +573,24 @@ function createArr() {
   obj.value = value;
   arrDialogVisible.value = false;
 }
+// // 变更arr长度
+// function changeLength(key) {
+//   ElMessageBox.prompt('请输入数组长度', 'Tip', {
+//     confirmButtonText: 'OK',
+//     cancelButtonText: 'Cancel',
+//   }).then(({ value }) => {
+//     const arr = findObj(key).value;
+//     const length = parseInt(value);
+//     console.log(arr);
+//     // while (arr.length * 10 > length + 1) arr.pop();
+//     while (arr.length * 5 <= length) arr.push([],[]);
+//     console.log(arr);
+//     while (arr[arr.length - 1].length > length % 10) arr[arr.length - 1].pop();
+//     while (arr[arr.length - 1].length < length % 10) arr[arr.length - 1].push('?');
+//     console.log(arr);
+//   });
+// }
+// 根据key找子值
 function findObj(key) {
   let stk: Array<any> = [canvasBox.value];
   while (stk.length) {
@@ -697,14 +717,18 @@ onMounted(() => {
             <table>
               <tr v-for="(child, idx) in item.children" :key="child.key">
                 <td class="stackFrameVar">
-                  <div @blur="handleChangeItemName(child.key, 'varKey', $event)" class="text" @mousedown.stop="" :contenteditable="isEditable">
-                    {{ child.varKey }} <el-button v-if="isEditable" @click="deleteVar(item.children, idx)" style="height: 12px; width: 12px" :icon="Close" type="danger" circle></el-button>
+                  <div class="varKey">
+                    <el-button v-if="isEditable" @click="deleteVar(item.children, idx)" class="closeButton" :icon="Close" type="danger" circle></el-button>
+                    <span @blur="handleChangeItemName(child.key, 'varKey', $event)" class="text" @mousedown.stop="" :contenteditable="isEditable"> {{ child.varKey }}</span
+                    ><el-button class="changeButton" v-if="isEditable && typeof child.value == 'object'" @click="openDialog(child.key)" plain type="primary" @mousedown.stop="" size="small"
+                      >重设数组</el-button
+                    >
                   </div>
                 </td>
                 <td class="stackFrameValue">
                   <div class="typeLabel text" @mousedown.stop="" @blur="handleChangeItemName(child.key, 'type', $event)" :contenteditable="isEditable">{{ child.type }}</div>
                   <div v-if="typeof child.value == 'string'" class="cdataElt text">
-                    <span class="text" @blur="handleChangeItemName(child.key, 'value', $event)" @mousedown.stop="" :contenteditable="isEditable" style="padding-right: 20px">{{ child.value }} </span
+                    <span class="text" @blur="handleChangeItemName(child.key, 'value', $event)" @mousedown.stop="" :contenteditable="isEditable">{{ child.value }} </span
                     ><el-button v-if="isEditable" @click="openDialog(child.key)" plain type="primary" @mousedown.stop="" size="small">设为数组</el-button>
                   </div>
                   <table v-else class="cArrayTbl">
@@ -713,7 +737,7 @@ onMounted(() => {
                         <span class="cArrayHeader" v-if="val.isIndex">{{ val.value }}</span>
                         <div class="cArrayElt" v-else>
                           <div class="typeLabel text" @blur="handleChangeItemName(val.key, 'type', $event)" @mousedown.stop="" :contenteditable="isEditable">{{ val.type }}</div>
-                          <div class="cdataElt text" @blur="handleChangeItemName(val.key, 'value', $event)" @mousedown.stop="" :contenteditable="isEditable">{{ val.value }}</div>
+                          <div class="cdataElt text" @blur="handleChangeItemName(val.key, 'value', $event)" @mousedown.stop="" :contenteditable="true">{{ val.value }}</div>
                         </div>
                       </td>
                     </tr>
@@ -721,7 +745,7 @@ onMounted(() => {
                 </td>
               </tr>
             </table>
-            <el-button plain type="primary" @mousedown.stop="" @click.prevent="addVar(item.key)" class="addVar">添加变量</el-button>
+            <el-button v-if="isEditable" plain type="primary" @mousedown.stop="" @click.prevent="addVar(item.key)" class="addVar">添加变量</el-button>
           </div>
         </div>
         <svg class="svg" :style="{ zIndex: typeName == 'arrow' || !isEditable || arrowShow ? 3 : 'auto' }">
@@ -743,7 +767,7 @@ onMounted(() => {
             stroke-width="1"
             style="marker-end: url(#triangle); marker-start: url(#dot)"
           ></path>
-          <path v-show="arrowShow" v-for="item in svgArr" :key="item.key" :d="getDeleteSvg(item.style)" @click="deleteArrow(item.key)" fill="none" stroke="red" stroke-width="1"></path>
+          <path v-show="arrowShow && isEditable" v-for="item in svgArr" :key="item.key" :d="getDeleteSvg(item.style)" @click="deleteArrow(item.key)" fill="none" stroke="red" stroke-width="1"></path>
         </svg>
         <div class="mark-line">
           <div v-for="line in lines" v-show="lineStatus[line].status" :key="line" :ref="line" class="line" :class="line.includes('x') ? 'xline' : 'yline'" :style="lineStatus[line].value"></div>
@@ -813,24 +837,6 @@ onMounted(() => {
     border-radius: 3px;
     display: flex;
     align-items: center;
-    .el-button {
-      &:active {
-        color: #606266;
-        background-color: #ffffff;
-        outline: 0;
-        border-color: #dcdfe6;
-      }
-      &:focus {
-        color: #606266;
-        background-color: #ffffff;
-        outline: 0;
-        border-color: #dcdfe6;
-      }
-      &.active {
-        color: #409eff;
-        background-color: #ecf5ff;
-      }
-    }
     &.active {
       background-color: rgba(0, 0, 0, 0.5);
       color: white;
@@ -939,10 +945,27 @@ onMounted(() => {
           outline: none;
         }
       }
+      .varKey {
+        position: relative;
+        .closeButton {
+          position: absolute;
+          right: 0px;
+          top: -10px;
+          height: 12px;
+          width: 12px;
+        }
+        .changeButton {
+          position: absolute;
+          right: -10px;
+          top: 30px;
+          width: 55px;
+        }
+      }
       tr {
         vertical-align: middle;
         display: table-row;
         .stackFrameVar {
+          position: relative;
           text-align: right;
           padding-right: 8px;
           padding-top: 3px;

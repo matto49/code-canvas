@@ -1,11 +1,11 @@
 <script setup>
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
-import HelloWorld from "./components/HelloWorld.vue";
-import codeEdit from "./components/codeEdit.vue";
-import canvasBoard from "./components/CanvaBoard.vue";
-import { cloneDeep } from "xijs";
-import { reactive, ref, unref, watch, toRaw } from "vue";
+import HelloWorld from './components/HelloWorld.vue';
+import codeEdit from './components/codeEdit.vue';
+import canvasBoard from './components/CanvaBoard.vue';
+import { cloneDeep } from 'xijs';
+import { reactive, ref, unref, watch, toRaw } from 'vue';
 const canvasRect = reactive([
   {
     rect: [],
@@ -25,7 +25,7 @@ function pre() {
   // 仅当next到底了，才能进行下一步操作
   click(canvasRect[curStep.value].lineCnt);
   isNextAble.value = true;
-  console.log(curStep.value, "pre", maxStep);
+  console.log(curStep.value, 'pre', maxStep);
   if (curStep.value == 0) isPreAble.value = false;
 }
 function next() {
@@ -33,7 +33,7 @@ function next() {
   maxStep = Math.max(curStep.value, maxStep);
   click(canvasRect[curStep.value].lineCnt);
   isPreAble.value = true;
-  console.log(curStep.value, "next", maxStep);
+  console.log(curStep.value, 'next', maxStep);
   if (curStep.value == maxStep) isNextAble.value = false;
 }
 let canvas = ref(null);
@@ -47,7 +47,7 @@ function focus(lineCnt) {
   }
   curStep.value++;
   maxStep = Math.max(curStep.value, maxStep);
-  console.log(curStep.value, "focus", maxStep);
+  console.log(curStep.value, 'focus', maxStep);
   isPreAble.value = true;
   isNextAble.value = false;
   preLine = lineCnt;
@@ -61,30 +61,31 @@ function changeCanvas(rectData) {
   canvasRect[curStep.value].rect = value;
 }
 function click(line) {
-  const lineDom = document.querySelectorAll(".cm-line");
+  const lineDom = document.querySelectorAll('.cm-line');
   for (let i = 0; i < lineDom.length; i++) {
-    lineDom[i].classList.remove("cm-activeLine");
+    lineDom[i].classList.remove('cm-activeLine');
   }
-  if (line <= lineDom.length) lineDom[line - 1].classList.add("cm-activeLine");
+  if (line <= lineDom.length) lineDom[line - 1].classList.add('cm-activeLine');
 }
 </script>
 <script>
 let id = 1;
 export default {
-  name: "simple",
-  display: "Simple",
+  name: 'simple',
+  display: 'Simple',
   order: 0,
   data() {
     return {
       list: [
-        { name: "John", id: 0 },
-        { name: "Joao", id: 1 },
-        { name: "Jean", id: 2 },
+        { name: 'John', id: 0 },
+        { name: 'Joao', id: 1 },
+        { name: 'Jean', id: 2 },
       ],
     };
   },
 };
-</script><style scoped>
+</script>
+<style scoped>
 .buttons {
   margin-top: 35px;
 }
@@ -113,7 +114,7 @@ export default {
   </div>
 </template>
 
-<style>
+<style lang="scss">
 html {
   background-color: #f5f5f5;
 }
@@ -130,5 +131,23 @@ html {
 }
 .ͼ2 .cm-activeLineGutter {
   background: none;
+}
+.el-button {
+  &:active {
+    color: #606266;
+    background-color: #ffffff;
+    outline: 0;
+    border-color: #dcdfe6;
+  }
+  &:focus {
+    color: #606266;
+    background-color: #ffffff;
+    outline: 0;
+    border-color: #dcdfe6;
+  }
+  &.active {
+    color: #409eff;
+    background-color: #ecf5ff;
+  }
 }
 </style>
