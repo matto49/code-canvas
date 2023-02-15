@@ -1,11 +1,13 @@
-<script setup>
-import { ref, shallowRef, defineProps, defineEmits, computed, onMounted } from 'vue';
+<script setup lang="ts">
+import { ref, shallowRef, defineEmits, defineProps, computed, onMounted, watch } from 'vue';
 import { Codemirror } from 'vue-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorState, EditorSelection } from '@codemirror/state';
+import type { UploadUserFile } from 'element-plus';
+const props = defineProps(['canEditable'])
 const code = ref(`int main({
   
 })`);
@@ -40,26 +42,31 @@ function getLine(cnt, text) {
   }
   return res;
 }
-const input = ref(null);
-onMounted(() => {
-  input.value.addEventListener('change', () => {
-    const reader = new FileReader();
-    reader.readAsText(input.value.files[0]);
-    reader.onload = () => {
-      code.value = reader.result;
-    };
-  });
+const input = ref<UploadUserFile[]>([]);
+watch(input, () => {
+  const reader = new FileReader();
+  if (input.value[0].raw) reader.readAsText(input.value[0].raw);
+  reader.onload = () => {
+    code.value = reader.result;
+  };
 });
+const isEditable = ref(true);
+const title = ref('hello,world!');
+function handleTitle(e) {
+  title.value = e.target.innerText;
+}
 </script>
 <template>
   <div>
     <div class="topblank"></div>
     <div class="top-container">
-      <div class="input">
-        <label for="input">选择文件</label>
-        <input id="input" type="file" ref="input" />
-      </div>
-      <el-button plain type="primary">保存</el-button>
+      <el-upload action="#" :auto-upload="false" v-model:file-list="input" :show-file-list="false" class="upload-demo" :limit="1">
+        <el-button v-if="props.canEditable" type="primary" plain>选择文件</el-button>
+      </el-upload>
+      <el-button v-if="props.canEditable" plain type="primary">保存</el-button>
+    </div>
+    <div class="title">
+      <div class="text" :contenteditable="props.canEditable" @blur="handleTitle">hello world!</div>
     </div>
     <div class="code-container">
       <div class="leftblank"></div>
@@ -85,7 +92,7 @@ onMounted(() => {
 </template>
 <style lang="less">
 .top-container {
-  margin-top: 5vh;
+  margin-top: 3vh;
   display: flex;
   justify-content: space-around;
   .input {
@@ -101,10 +108,20 @@ onMounted(() => {
     }
   }
 }
+.title {
+  text-align: center;
+  margin: 10px;
+}
 .code-container {
   display: flex;
 }
 .code-content {
   background-color: #fff;
+}
+.text {
+  cursor: text;
+  &:focus {
+    outline: none;
+  }
 }
 </style>

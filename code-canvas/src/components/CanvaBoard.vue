@@ -2,7 +2,7 @@
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import BaseBoard from './BaseBoard.vue';
-import { ref, onMounted, watch, defineEmits, defineProps, computed } from 'vue';
+import { ref, onMounted, watch, defineEmits, computed } from 'vue';
 import { Close } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import 'element-plus/theme-chalk/index.css';
@@ -46,7 +46,7 @@ const mouseAbsPos = ref({
   x: 0,
   y: 0,
 });
-const props = defineProps(['canvasRect', 'curStep', 'isNextAble', 'isPreAble']);
+const props = defineProps(['canvasRect', 'curStep', 'isNextAble', 'isPreAble', 'canEditable']);
 function switchVw(raw: string): number {
   if (raw.includes('vw')) return (innerWidth * parseFloat(raw)) / 100;
   else if (raw.includes('vh')) return (innerHeight * parseFloat(raw)) / 100;
@@ -774,7 +774,7 @@ onMounted(() => {
         </div>
       </div>
     </BaseBoard>
-    <el-button class="toolbar" @click="isEditable = true" v-if="!isEditable">进入编辑模式</el-button>
+    <el-button class="toolbar" @click="isEditable = true" v-if="props.canEditable && !isEditable">进入编辑模式</el-button>
     <div v-if="isEditable" class="toolbar">
       <el-button v-for="item in rectTypes" :key="item" draggable="true" @dragstart="handleDragStart(item)">
         <span>{{ item }}</span>
@@ -821,6 +821,24 @@ onMounted(() => {
 </template>
 
 <style scoped lang="less">
+.el-button {
+  &:active {
+    color: #606266;
+    background-color: #ffffff;
+    outline: 0;
+    border-color: #dcdfe6;
+  }
+  &:focus {
+    color: #606266;
+    background-color: #ffffff;
+    outline: 0;
+    border-color: #dcdfe6;
+  }
+  &.active {
+    color: #409eff;
+    background-color: #ecf5ff;
+  }
+}
 .canvaWrap {
   position: relative;
   user-select: none;
@@ -937,12 +955,6 @@ onMounted(() => {
           width: 12px;
           cursor: pointer;
           // text-align: center;
-        }
-      }
-      .text {
-        cursor: text;
-        &:focus {
-          outline: none;
         }
       }
       .varKey {
@@ -1078,6 +1090,12 @@ onMounted(() => {
     &.able:hover {
       background-color: rgba(110, 38, 236, 0.1);
     }
+    &:focus {
+      color: #409eff;
+      background-color: #ecf5ff;
+      outline: 0;
+      border-color: #a0cfff;
+    }
   }
   .next {
     position: absolute;
@@ -1089,6 +1107,12 @@ onMounted(() => {
     border: 1px solid rgba(0, 0, 0, 0.5);
     &.able:hover {
       background-color: rgba(110, 38, 236, 0.1);
+    }
+    &:focus {
+      color: #409eff;
+      background-color: #ecf5ff;
+      outline: 0;
+      border-color: #a0cfff;
     }
   }
   .mark-line {
