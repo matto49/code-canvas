@@ -26,4 +26,13 @@ export default defineConfig({
         },
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://47.94.94.135:8080',
+        changeOrigin: true, // 允许跨域
+        rewrite: (path) => path.replace(/^\/api/,'')
+      }
+    }
+  }
 })

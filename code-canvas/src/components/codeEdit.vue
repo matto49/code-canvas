@@ -7,11 +7,13 @@ import { cpp } from '@codemirror/lang-cpp';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { EditorState, EditorSelection } from '@codemirror/state';
 import type { UploadUserFile } from 'element-plus';
-const props = defineProps(['canEditable'])
+import { useRouter } from 'vue-router';
+const router = useRouter();
+const props = defineProps(['canEditable', 'code']);
 const code = ref(`int main({
   
 })`);
-const emit = defineEmits(['focus']);
+const emit = defineEmits(['focus', 'save']);
 const extensions = [cpp()];
 // Codemirror EditorView instance ref
 const view = shallowRef();
@@ -50,6 +52,13 @@ watch(input, () => {
     code.value = reader.result;
   };
 });
+watch(
+  () => props.code,
+  () => {
+    console.log(props.code)
+    code.value = props.code;
+  }
+);
 const isEditable = ref(true);
 const title = ref('hello,world!');
 function handleTitle(e) {
@@ -60,10 +69,11 @@ function handleTitle(e) {
   <div>
     <div class="topblank"></div>
     <div class="top-container">
-      <el-upload action="#" :auto-upload="false" v-model:file-list="input" :show-file-list="false" class="upload-demo" :limit="1">
-        <el-button v-if="props.canEditable" type="primary" plain>选择文件</el-button>
+      <el-upload action="#" v-if="props.canEditable" :auto-upload="false" v-model:file-list="input" :show-file-list="false" class="upload-demo" :limit="1">
+        <el-button type="primary" plain>选择文件</el-button>
       </el-upload>
-      <el-button v-if="props.canEditable" plain type="primary">保存</el-button>
+      <el-button @click="router.push('/list')" plain type="primary">返回</el-button>
+      <el-button v-if="props.canEditable" @click="emit('save', code, title)" plain type="primary">保存</el-button>
     </div>
     <div class="title">
       <div class="text" :contenteditable="props.canEditable" @blur="handleTitle">hello world!</div>

@@ -1,13 +1,14 @@
 <script setup>
 import { useRouter } from 'vue-router';
-import { ref } from 'vue';
+import { getList } from '../api';
+import { onMounted, ref } from 'vue';
 const router = useRouter();
-const list = ref([
-  { name: '代码1', content: 'int a = 123;' },
-  { name: '代码2', content: 'int a = 123;' },
-  { name: '代码3', content: 'int a = 123;' },
-]);
-
+const list = ref([]);
+const role = ref(localStorage.getItem('role'));
+onMounted(async () => {
+  const { frames } = (await getList()).data;
+  list.value = frames;
+});
 defineProps({
   msg: String,
 });
@@ -24,31 +25,34 @@ const count = ref(0);
           <el-button @click="router.push({ path: '/edit', query: { name: item.name } })" class="button" text>进入代码演示界面</el-button>
         </div>
       </template>
-      <div class="code">{{ item.content }}</div>
+      <div class="code">{{ item.code }}</div>
     </el-card>
-    <el-button @click="router.push({ path: '/edit', query: { canEditable: true } })" size="large" type="primary">添加新代码</el-button>
+    <el-button class="button" v-if="role == 'admin'" @click="router.push({ path: '/edit', query: { canEditable: true } })" size="large" type="primary">添加新代码</el-button>
   </div>
 </template>
 
 <style scoped lang="less">
 .container {
-  height: 100vh;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  overflow: auto;
+  // height: 100vh;
+  width: calc(100% - 100px);
+  display: grid;
+  padding: 50px;
+  grid-template-columns: 1fr 1fr;
   .item {
-    margin: 10px;
+    margin: 10px 50px;
   }
   .code {
     display: -webkit-box;
     white-space: pre-wrap;
     font-size: 12px;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: 5;
     overflow: hidden;
+  }
+  .button {
+    align-self: center;
+    justify-self: center;
+    width: 100px;
   }
 }
 </style>

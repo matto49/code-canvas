@@ -10,22 +10,19 @@ const router = createRouter({
   history: createWebHashHistory(),
   routes,
 });
-// router.beforeEach((to, from, next) => {
-//   const role = localStorage.getItem('role');
-//   if (to.path == '/' && role) {
-//     console.log('???');
-//     next({
-//       path: '/list',
-//     });
-//   } else if (to.path != '/login') {
-//     if (!role || role != 'ADMIN') {
-//       console.log('???');
-//       next({
-//         path: '/login',
-//       });
-//     } else {
-//       next();
-//     }
-//   }
-// });
+router.beforeEach((to, from, next) => {
+  const role = localStorage.getItem('role');
+  console.log(role)
+  if (to.path == '/' && role) {
+    next('/list');
+  } else if (to.path != '/login') {
+    if (!role) {
+      next('/login');
+    } else {
+      next();
+    }
+  } else {
+    next()
+  }
+});
 export default router;

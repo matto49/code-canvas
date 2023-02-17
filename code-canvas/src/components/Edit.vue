@@ -1,13 +1,15 @@
 <script setup>
 import { useRoute } from 'vue-router';
-// This starter template is using Vue 3 <script setup> SFCs
-// Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
+import { getCanvas, addCanvas } from '../api';
+import { ElMessage } from 'element-plus';
 import codeEdit from './codeEdit.vue';
 import canvasBoard from './CanvaBoard.vue';
+import { getList } from '../api';
 import { cloneDeep } from 'xijs';
 import { reactive, ref, unref, watch, toRaw, onMounted } from 'vue';
+import router from '../router';
 const route = useRoute();
-const canvasRect = reactive([
+let canvasRect = reactive([
   {
     rect: [],
     lineCnt: 1,
@@ -36,16 +38,15 @@ function next() {
   maxStep = Math.max(curStep.value, maxStep);
   click(canvasRect[curStep.value].lineCnt);
   isPreAble.value = true;
-  console.log(curStep.value, 'next', maxStep);
   if (curStep.value == maxStep) isNextAble.value = false;
 }
-let canvas = ref(null);
 let preLine = 1;
+let code = ref('');
 function focus(lineCnt) {
   if (!canEditable.value) {
     click(canvasRect[curStep.value].lineCnt);
     return;
-  };
+  }
   // focus事件大量触发，只有在lineCnt发生变化时才处理
   if (lineCnt == preLine || curStep.value != maxStep) {
     click(canvasRect[curStep.value].lineCnt);
@@ -72,9 +73,44 @@ function click(line) {
   }
   if (line <= lineDom.length) lineDom[line - 1].classList.add('cm-activeLine');
 }
-onMounted(() => {
+async function save(code_body, name) {
+  const layers = canvasRect.map((item) => {
+    return {
+      line_number: item.lineCnt,
+      json_body: JSON.stringify(item.rect),
+    };
+  });
+  try {
+    const res = await addCanvas({ layers, code_body, name });
+    ElMessage({
+      message: '保存成功',
+      type: 'success',
+    });
+    router.push('/list');
+  } catch (err) {
+    ElMessage({
+      message: '保存失败',
+      type: 'warning',
+    });
+  }
+}
+onMounted(async () => {
   const query = route.query;
   if (query.canEditable) canEditable.value = true;
+  console.log(query);
+  if (query.name) {
+    const { data } = await getCanvas({ name: query.name });
+    code.value = data.code_body;
+    const { layers } = data;
+    canvasRect = layers.map((item) => {
+      return {
+        lineCnt: item.line_number,
+        rect: JSON.parse(item.json_body),
+      };
+    });
+    maxStep = canvasRect.length - 1;
+    isNextAble.value = true;
+  }
 });
 </script>
 <script>
@@ -108,7 +144,7 @@ export default {
 </style>
 <template>
   <div class="container">
-    <codeEdit class="code" @focus="focus" :canEditable="canEditable"></codeEdit>
+    <codeEdit class="code" @focus="focus" :code="code" :canEditable="canEditable" @save="save"></codeEdit>
     <canvasBoard
       :canvasRect="canvasRect[curStep].rect"
       :curStep="curStep"

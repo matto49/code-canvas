@@ -1,12 +1,29 @@
 <script setup>
+import { ElMessage } from 'element-plus';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { login } from '../api';
 const name = ref('');
 const pwd = ref('');
 const router = useRouter();
-function login() {
-  localStorage.setItem('role', 'admin');
-  router.push({ path: '/list' });
+async function loginAcc() {
+  try {
+    const res = await login({
+      username: name.value,
+      password: pwd.value,
+    });
+    ElMessage({
+      message: '登录成功',
+      type: 'success',
+    });
+    localStorage.setItem('role', 'admin');
+    router.push({ path: '/list' });
+  } catch (err) {
+    ElMessage({
+      message: '账户不匹配',
+      type: 'error',
+    });
+  }
 }
 defineProps({
   msg: String,
@@ -25,7 +42,7 @@ const count = ref(0);
         <el-input placeholder="请输入密码" v-model="pwd" show-password class="input_style" size="large"></el-input>
       </div>
       <div class="login-container">
-        <el-button type="primary" @click="login" class="login_style">登录</el-button>
+        <el-button type="primary" @click="loginAcc" class="login_style">登录</el-button>
       </div>
     </div>
   </div>
