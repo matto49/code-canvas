@@ -2,7 +2,7 @@
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import BaseBoard from './BaseBoard.vue';
-import { ref, onMounted, watch, defineEmits, computed } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { Close } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import 'element-plus/theme-chalk/index.css';
