@@ -85,7 +85,6 @@ const recordManager = ref<any>([
     maxLimit: 50,
   },
 ]);
-let arrowShow = ref(false);
 //
 const handleShapeClick = (name: string) => {
   if (typeName.value == name) typeName.value = '';
@@ -167,7 +166,6 @@ const handleMouseChange = (x: number, y: number) => {
           if (v.typeName == 'arrow' && curPoint == 'i') {
             width = x0 - left;
             height = y0 - top;
-            console.log(width, height);
           }
           return {
             ...v,
@@ -252,7 +250,7 @@ const handleClear = () => {
 const undo = () => {
   // 撤销
   const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
-  if (curIndex === 0) return;
+  if (curIndex === 1) return;
   recordManager.value[props.curStep].curIndex--;
   canvasBox.value = cloneDeep(recordManager.value[props.curStep].snapshots[recordManager.value[props.curStep].curIndex]);
   emit('change', canvasBox.value);
@@ -281,7 +279,6 @@ const handleDelItem = (key: string) => {
 };
 
 const pushRecordFn = (state: IBaseShapeProp[], prevState: IBaseShapeProp[]) => {
-  console.log('push', state);
   const { snapshots, maxLimit, curIndex } = recordManager.value[props.curStep];
   // 如果两个状态相同, 则不推入历史记
   if (!diff(state, snapshots[curIndex])) {
@@ -581,13 +578,10 @@ function createArr() {
 //   }).then(({ value }) => {
 //     const arr = findObj(key).value;
 //     const length = parseInt(value);
-//     console.log(arr);
 //     // while (arr.length * 10 > length + 1) arr.pop();
 //     while (arr.length * 5 <= length) arr.push([],[]);
-//     console.log(arr);
 //     while (arr[arr.length - 1].length > length % 10) arr[arr.length - 1].pop();
 //     while (arr[arr.length - 1].length < length % 10) arr[arr.length - 1].push('?');
-//     console.log(arr);
 //   });
 // }
 // 根据key找子值
@@ -602,6 +596,9 @@ function findObj(key) {
       } else {
         if (arr[i].children) {
           stk.push(arr[i].children);
+        } else if (arr[i].value instanceof Array) {
+          // 值为数组的情况
+          stk.push(...arr[i].value);
         }
       }
     }
@@ -633,6 +630,9 @@ function addVar(key: string) {
 }
 const svgArr = computed(() => {
   return canvasBox.value.filter((item) => item.typeName == 'arrow');
+});
+const boxArr = computed(() => {
+  return canvasBox.value.filter((item) => item.typeName != 'arrow');
 });
 watch(canvasBox, debounce(pushRecordFn, 300), { deep: true });
 watch(
@@ -748,7 +748,7 @@ onMounted(() => {
             <el-button v-if="isEditable" plain type="primary" @mousedown.stop="" @click.prevent="addVar(item.key)" class="addVar">添加变量</el-button>
           </div>
         </div>
-        <svg class="svg" :style="{ zIndex: typeName == 'arrow' || !isEditable || arrowShow ? 3 : 'auto' }">
+        <svg class="svg" :style="{ zIndex: typeName == 'arrow' || !isEditable || typeName == 'arrowShow' ? 3 : 'auto' }">
           <defs>
             <marker id="dot" markerUnits="strokeWidth" markerWidth="6" markerHeight="6">
               <circle cx="3" cy="3" r="3" />
@@ -767,7 +767,26 @@ onMounted(() => {
             stroke-width="1"
             style="marker-end: url(#triangle); marker-start: url(#dot)"
           ></path>
-          <path v-show="arrowShow && isEditable" v-for="item in svgArr" :key="item.key" :d="getDeleteSvg(item.style)" @click="deleteArrow(item.key)" fill="none" stroke="red" stroke-width="1"></path>
+          <circle
+            v-for="item in svgArr"
+            :key="item.key"
+            :cx="parseFloat(item.style.left) + 10"
+            :cy="parseFloat(item.style.top)"
+            r="8  "
+            fill="rgba(0,0,0,0)"
+            v-show="typeName == 'arrowShow' && isEditable"
+            @click="deleteArrow(item.key)"
+          ></circle>
+          <path
+            v-show="typeName == 'arrowShow' && isEditable"
+            v-for="item in svgArr"
+            :key="item.key"
+            :d="getDeleteSvg(item.style)"
+            @click="deleteArrow(item.key)"
+            fill="none"
+            stroke="red"
+            stroke-width="1"
+          ></path>
         </svg>
         <div class="mark-line">
           <div v-for="line in lines" v-show="lineStatus[line].status" :key="line" :ref="line" class="line" :class="line.includes('x') ? 'xline' : 'yline'" :style="lineStatus[line].value"></div>
@@ -786,8 +805,8 @@ onMounted(() => {
           <input v-model="defaultName" placeholder="默认值" @click.stop="null" />
         </div>
       </div> -->
-      <el-button @click="arrowShow = !arrowShow" :class="arrowShow ? 'active' : ''">
-        <span>箭头置于顶部</span>
+      <el-button @click="handleShapeClick('arrowShow')" :class="typeName == 'arrowShow' ? 'active' : ''">
+        <span>显示/删除箭头</span>
       </el-button>
       <el-button @click="handleShapeClick('arrow')" :class="typeName == 'arrow' ? 'active' : ''">
         <span>开始创建箭头</span>
@@ -902,6 +921,10 @@ onMounted(() => {
   }
   .shapeWrap {
     height: 80vh;
+    > div {
+      height: 0;
+      width: 0;
+    }
     .svg {
       position: absolute;
       z-index: auto;

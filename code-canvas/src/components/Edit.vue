@@ -96,6 +96,7 @@ async function save(code_body, name) {
 }
 onMounted(async () => {
   const query = route.query;
+  console.log(query)
   if (query.canEditable) canEditable.value = true;
   console.log(query);
   if (query.name) {
