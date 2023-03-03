@@ -4,8 +4,6 @@ import { Codemirror } from 'vue-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { java } from '@codemirror/lang-java';
 import { cpp } from '@codemirror/lang-cpp';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { EditorState, EditorSelection } from '@codemirror/state';
 import type { UploadUserFile } from 'element-plus';
 import { useRouter } from 'vue-router';
 const router = useRouter();
@@ -14,31 +12,24 @@ const code = ref(`int main({
   
 })`);
 const emit = defineEmits(['focus', 'save']);
-const extensions = [cpp()];
+const extensions = [cpp(), javascript(), java()];
 // Codemirror EditorView instance ref
 const view = shallowRef();
-const handleReady = (payload) => {
-  view.value = payload.view;
-};
-
-// Status is available at all times via Codemirror EditorView
-const getCodemirrorStates = () => {
-  const state = view.value.state;
-  const ranges = state.selection.ranges;
-  const selected = ranges.reduce((r, range) => r + range.to - range.from, 0);
-  const cursor = ranges[0].anchor;
-  const length = state.doc.length;
-  const lines = state.doc.lines;
-  // more state info ...
-  // return ...
-};
 function change(e) {
-  emit('focus', getLine(e.state.selection.main.from, e.state.doc.text));
+  let textArr: String[] = [];
+  // 根据代码长度不同，e.state.doc有俩种数值
+  if (e.state.doc.children) {
+    e.state.doc.children.forEach((item: String[]) => textArr.push(...item));
+  } else {
+    textArr.push(...e.state.doc.text);
+  }
+  emit('focus', getLine(e.state.selection.main.from, textArr));
 }
 function getLine(cnt, text) {
   let temp = cnt + 1;
   let res = 0;
-  while (temp > 0) {
+  while (temp > 0 && text) {
+    // +1是因为temp的idx算入\n，但是text数组每一项中没有\n
     temp -= text[res].length + 1;
     res++;
   }
@@ -47,15 +38,14 @@ function getLine(cnt, text) {
 const input = ref<UploadUserFile[]>([]);
 watch(input, () => {
   const reader = new FileReader();
-  if (input.value[0].raw) reader.readAsText(input.value[0].raw);
+  if (input.value && input.value[0].raw) reader.readAsText(input.value[0].raw);
   reader.onload = () => {
-    code.value = reader.result;
+    code.value = reader.result as string;
   };
 });
 watch(
   () => props.code,
   () => {
-    console.log(props.code)
     code.value = props.code;
   }
 );

@@ -2,8 +2,8 @@
 import { useRoute } from 'vue-router';
 import { getCanvas, addCanvas } from '../api';
 import { ElMessage } from 'element-plus';
-import codeEdit from './codeEdit.vue';
-import canvasBoard from './CanvaBoard.vue';
+import codeEdit from '@/components/codeEdit.vue';
+import canvasBoard from '@/components/CanvasBoard.vue';
 import { getList } from '../api';
 import { cloneDeep } from 'xijs';
 import { reactive, ref, unref, watch, toRaw, onMounted } from 'vue';
@@ -30,7 +30,6 @@ function pre() {
   // 仅当next到底了，才能进行下一步操作
   click(canvasRect[curStep.value].lineCnt);
   isNextAble.value = true;
-  console.log(curStep.value, 'pre', maxStep);
   if (curStep.value == 0) isPreAble.value = false;
 }
 function next() {
@@ -43,8 +42,9 @@ function next() {
 let preLine = 1;
 let code = ref('');
 function focus(lineCnt) {
+  // 无法禁止codeMirror的点击变更背景颜色行为，所以使用click之前那一行来实现
   if (!canEditable.value) {
-    click(canvasRect[curStep.value].lineCnt);
+    click(preLine);
     return;
   }
   // focus事件大量触发，只有在lineCnt发生变化时才处理
@@ -60,12 +60,12 @@ function focus(lineCnt) {
   canvasRect[curStep.value] = cloneDeep(canvasRect[curStep.value - 1]);
   canvasRect[curStep.value].lineCnt = lineCnt;
   // canvasRect[curStep.value].lineCnt = lineCnt;
-  // console.log(canvasRect);
 }
 function changeCanvas(rectData) {
   const value = rectData.map((item) => toRaw(item));
   canvasRect[curStep.value].rect = value;
 }
+// 模拟点击代码行背景颜色变化
 function click(line) {
   const lineDom = document.querySelectorAll('.cm-line');
   for (let i = 0; i < lineDom.length; i++) {
@@ -96,9 +96,7 @@ async function save(code_body, name) {
 }
 onMounted(async () => {
   const query = route.query;
-  console.log(query)
   if (query.canEditable) canEditable.value = true;
-  console.log(query);
   if (query.name) {
     const { data } = await getCanvas({ name: query.name });
     code.value = data.code_body;

@@ -673,7 +673,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="canvaWrap" @click="handleClearSelect">
+  <div class="canvasWrap" @click="handleClearSelect">
     <BaseBoard msg="几何画板" ref="boardDom" :onMouseChange="handleMouseChange" @dragover="handelDragover" @drop="handelDrop">
       <!-- <div class="static-area">栈区</div>
       <div class="heap">堆区</div>
@@ -858,7 +858,7 @@ onMounted(() => {
     background-color: #ecf5ff;
   }
 }
-.canvaWrap {
+.canvasWrap {
   position: relative;
   user-select: none;
   // text-align: center;

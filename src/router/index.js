@@ -2,9 +2,9 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 
 const routes = [
   { path: '/', redirect: '/list' },
-  { path: '/login', component: () => import('../components/login.vue') },
-  { path: '/edit', component: () => import('../components/Edit.vue') },
-  { path: '/list', component: () => import('../components/List.vue') },
+  { path: '/login', component: () => import('@/views/login.vue') },
+  { path: '/edit', component: () => import('@/views/Edit.vue') },
+  { path: '/list', component: () => import('@/views/List.vue') },
 ];
 const router = createRouter({
   history: createWebHashHistory(),
@@ -12,7 +12,6 @@ const router = createRouter({
 });
 router.beforeEach((to, from, next) => {
   const role = localStorage.getItem('role');
-  console.log(role)
   if (to.path == '/' && role) {
     next('/list');
   } else if (to.path != '/login') {

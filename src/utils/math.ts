@@ -63,12 +63,14 @@ const generateRectangleMeta = (startPos: [number, number], w: number, h: number)
   // 获取元素的绝对位置坐标（像对于页面左上角）
 const getElPagePos = (element: HTMLElement) => {
     //计算x坐标
-    let actualLeft = element.offsetLeft;
-    let actualTop = element.offsetTop;
+    let actualLeft = element.offsetLeft  + element.clientLeft;
+    let actualTop = element.offsetTop + element.clientTop;
+    console.log(element,element.offsetLeft,element.offsetTop)
     let current = element.offsetParent as HTMLElement;
     while (current !== null){
-      actualLeft += current.offsetLeft;
-      actualTop += (current.offsetTop + current.clientTop);
+      console.log(current,current.offsetLeft,current.offsetTop, current.clientTop)
+      actualLeft += current.offsetLeft + current.clientLeft;
+      actualTop += current.offsetTop + current.clientTop;
       current = current.offsetParent as HTMLElement;
     }
     //返回结果
