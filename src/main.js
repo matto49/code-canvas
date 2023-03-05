@@ -4,7 +4,9 @@ import VueCodemirror from 'vue-codemirror'
 import App from './App.vue'
 import ElementPlus from 'element-plus'
 import router from './router'
-import axios from 'axios'
+import { createPinia } from 'pinia'
+const pinia = createPinia()
+
 const app = createApp(App).use(VueCodemirror, {
   // optional default global options
   autofocus: true,
@@ -14,7 +16,7 @@ const app = createApp(App).use(VueCodemirror, {
   placeholder: 'Code goes here...',
   extensions: [basicSetup]
   // ...
-}).use(ElementPlus, { size: 'small', zIndex: 3000 }).use(router).mount('#app')
+}).use(ElementPlus, { size: 'small', zIndex: 3000 }).use(router).use(pinia).mount('#app')
 
 
 // 按需引入样式问题

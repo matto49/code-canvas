@@ -2,14 +2,20 @@
 // This starter template is using Vue 3 <script setup> SFCs
 // Check out https://vuejs.org/api/sfc-script-setup.html#script-setup
 import BaseBoard from './BaseBoard.vue';
+import ToolBar from './Toolbar.vue';
 import { ref, onMounted, watch, computed } from 'vue';
 import { Close } from '@element-plus/icons-vue';
 import { ElMessageBox } from 'element-plus';
 import 'element-plus/theme-chalk/index.css';
 import { diff } from '../utils/tool';
 import { debounce, cloneDeep } from 'xijs';
-import { getCurveSvg, getDeleteSvg } from '../utils/math';
-const rectTypes = ['memorySpace'];
+import { getCurveSvg, getDeleteSvg, switchVw } from '../utils/math';
+import { storeToRefs } from 'pinia';
+import { useStore } from '@/utils/store';
+
+const store = useStore();
+const { typeName, dragType, isEditable } = storeToRefs(store);
+
 const emit = defineEmits(['next', 'change', 'pre']);
 // 编辑/展示 edit/show
 const status = ref('edit');
@@ -29,11 +35,9 @@ interface IBaseShapeProp {
   key: string;
   style: any;
   typeName: string;
+  children: Var[];
   name?: string;
-  children?: Var[];
 }
-const typeName = ref('');
-const dragType = ref('');
 const arrayCnt = ref('');
 const defaultName = ref('');
 const boardDom = ref<any>(null);
@@ -47,25 +51,6 @@ const mouseAbsPos = ref({
   y: 0,
 });
 const props = defineProps(['canvasRect', 'curStep', 'isNextAble', 'isPreAble', 'canEditable']);
-function switchVw(raw: string): number {
-  if (raw.includes('vw')) return (innerWidth * parseFloat(raw)) / 100;
-  else if (raw.includes('vh')) return (innerHeight * parseFloat(raw)) / 100;
-  else return 0;
-}
-const defaultSize = {
-  var: {
-    width: switchVw('5vw'),
-    height: switchVw('5vw'),
-  },
-  memorySpace: {
-    width: switchVw('25vw') + 4,
-    height: switchVw('10vw') + 1,
-  },
-  array: {
-    width: switchVw('25vw') + 4,
-    height: switchVw('5vw'),
-  },
-};
 const curSelect = ref('');
 let curPoint = '';
 // 起始點
@@ -85,56 +70,31 @@ const recordManager = ref<any>([
     maxLimit: 50,
   },
 ]);
-//
-const handleShapeClick = (name: string) => {
-  if (typeName.value == name) typeName.value = '';
-  else typeName.value = name;
-};
-const handleDragStart = (name: string) => {
-  dragType.value = name;
-};
+
 const handelDragover = (e: DragEvent) => {
   e.preventDefault();
   e.stopPropagation();
 };
+
 const handelDrop = (e: DragEvent) => {
   const { offsetX, offsetY } = e;
   const type = dragType.value;
-  let { width, height } = defaultSize[type];
-  if (dragType.value == 'array') {
-    const lineCnt = Math.ceil(parseInt(arrayCnt.value) / 5);
-    height = height * (lineCnt + 1) + lineCnt;
-    const varSize = switchVw('5vw');
-    for (let row = 0; row < lineCnt; row++) {
-      for (let col = 0; col < 5; col++) {
-        if (row * 5 + col > parseInt(arrayCnt.value)) break;
-        canvasBox.value.push({
-          key: Date.now() + row * 10 + col + 1 + '',
-          style: {
-            left: offsetX - width / 2 + varSize * col + col + 'px',
-            top: offsetY - height / 2 + varSize * row + row * 0.5 + 'px',
-            width: varSize + 'px',
-            height: varSize + 'px',
-          },
-          typeName: 'val',
-          name: defaultName.value,
-        });
-      }
-    }
-  } else {
-    canvasBox.value.push({
-      key: Date.now() + '',
-      style: {
-        left: offsetX - width / 2 + 'px',
-        top: offsetY - height / 2 + 'px',
-        width: width + 'px',
-        height: height + 'px',
-      },
-      typeName: type,
-      name: type,
-    });
-  }
+  const width = switchVw('25vw') + 4;
+  const height = switchVw('10vw') + 1;
+  canvasBox.value.push({
+    key: Date.now() + '',
+    style: {
+      left: offsetX - width / 2 + 'px',
+      top: offsetY - height / 2 + 'px',
+      width: width + 'px',
+      height: height + 'px',
+    },
+    typeName: type,
+    name: type,
+    children: [],
+  });
 };
+
 const handleMouseChange = (x: number, y: number) => {
   mouseAbsPos.value = { x, y };
   if (curSelect.value.length && templateDot.length && !curDblclick.value.length) {
@@ -199,21 +159,6 @@ const handleMouseChange = (x: number, y: number) => {
 const handleMouseDown = () => {
   if (!isEditable.value) return;
   const { x, y } = mouseAbsPos.value;
-  if (typeName.value == 'arrow') {
-    const key = Date.now() + '';
-    canvasBox.value.push({
-      key,
-      style: {
-        left: x + 'px',
-        top: y + 'px',
-        width: 0,
-        height: 0,
-      },
-      typeName: 'arrow',
-    });
-    curSelect.value = key;
-    curPoint = 'i';
-  }
   templateDot = [x, y];
 };
 
@@ -509,8 +454,7 @@ function showLine() {
 function isNear(value1: number, value2: number) {
   return Math.abs(value1 - value2) < 8;
 }
-// 进入编辑模式
-let isEditable = ref(false);
+
 // 编辑变量双向绑定
 function handleChangeItemName(key: string, prop, e: Event) {
   const obj = findObj(key);
@@ -540,17 +484,20 @@ function deleteVar(arr, idx) {
 }
 // 更改值为arr
 function createArr() {
+  // 找到对应的作用域
   const obj = findObj(key.value);
   if (!obj) return;
   obj.type = 'array';
-  // 10个一行
+  // 10个一行 变量序列一行，变量值一行
   let length = Math.floor(arrDialogCnt.value / 10) * 2;
   let value = new Array(length).fill([0]).map(() => new Array(10).fill(0));
+  // 最后一行不满10个
   const leftLength = arrDialogCnt.value % 10;
   value.push(new Array(leftLength).fill(0));
   value.push(new Array(leftLength).fill(0));
   for (let i = 0; i < value.length; i++) {
     for (let j = 0; j < value[i].length; j++) {
+      // 依次改为序列号和变量值
       if (i % 2 == 0) {
         value[i][j] = {
           isIndex: true,
@@ -570,20 +517,7 @@ function createArr() {
   obj.value = value;
   arrDialogVisible.value = false;
 }
-// // 变更arr长度
-// function changeLength(key) {
-//   ElMessageBox.prompt('请输入数组长度', 'Tip', {
-//     confirmButtonText: 'OK',
-//     cancelButtonText: 'Cancel',
-//   }).then(({ value }) => {
-//     const arr = findObj(key).value;
-//     const length = parseInt(value);
-//     // while (arr.length * 10 > length + 1) arr.pop();
-//     while (arr.length * 5 <= length) arr.push([],[]);
-//     while (arr[arr.length - 1].length > length % 10) arr[arr.length - 1].pop();
-//     while (arr[arr.length - 1].length < length % 10) arr[arr.length - 1].push('?');
-//   });
-// }
+
 // 根据key找子值
 function findObj(key) {
   let stk: Array<any> = [canvasBox.value];
@@ -605,36 +539,27 @@ function findObj(key) {
   }
   return null;
 }
+
 // 添加变量
 function addVar(key: string) {
   canvasBox.value.some((item) => {
     if (item.key == key) {
-      if (!item.children)
-        item.children = [
-          {
-            varKey: 'var',
-            value: '?',
-            type: 'int',
-            key: Date.now() + '',
-          },
-        ];
-      else
-        item.children.push({
-          varKey: 'var',
-          value: '?',
-          type: 'int',
-          key: Date.now() + '',
-        });
+      item.children.push({
+        varKey: 'var',
+        value: '?',
+        type: 'int',
+        key: Date.now() + '',
+      });
     }
   });
 }
+
 const svgArr = computed(() => {
   return canvasBox.value.filter((item) => item.typeName == 'arrow');
 });
-const boxArr = computed(() => {
-  return canvasBox.value.filter((item) => item.typeName != 'arrow');
-});
+
 watch(canvasBox, debounce(pushRecordFn, 300), { deep: true });
+
 watch(
   () => props.canvasRect,
   () => {
@@ -675,13 +600,9 @@ onMounted(() => {
 <template>
   <div class="canvasWrap" @click="handleClearSelect">
     <BaseBoard msg="几何画板" ref="boardDom" :onMouseChange="handleMouseChange" @dragover="handelDragover" @drop="handelDrop">
-      <!-- <div class="static-area">栈区</div>
-      <div class="heap">堆区</div>
-      <div class="show">展示区</div> -->
       <div class="shapeWrap">
         <div v-for="item in canvasBox" :key="item.key">
           <div
-            v-if="item.typeName != 'arrow'"
             :class="['shape', 'rect', curSelect == item.key ? 'active' : '', { editable: isEditable }]"
             :style="{
               left: item.style.left,
@@ -793,38 +714,7 @@ onMounted(() => {
         </div>
       </div>
     </BaseBoard>
-    <el-button class="toolbar" @click="isEditable = true" v-if="props.canEditable && !isEditable">进入编辑模式</el-button>
-    <div v-if="isEditable" class="toolbar">
-      <el-button v-for="item in rectTypes" :key="item" draggable="true" @dragstart="handleDragStart(item)">
-        <span>{{ item }}</span>
-      </el-button>
-      <!-- <div :class="['toolItem', 'rect', 'array', typeName == 'array' ? 'active' : '']">
-        <span @click="handleShapeClick('array')" :draggable="typeName == 'array'" @dragstart="handleDragStart('array')">array</span>
-        <div v-if="typeName == 'array'">
-          <input v-model="arrayCnt" placeholder="变量数" @click.stop="null" />
-          <input v-model="defaultName" placeholder="默认值" @click.stop="null" />
-        </div>
-      </div> -->
-      <el-button @click="handleShapeClick('arrowShow')" :class="typeName == 'arrowShow' ? 'active' : ''">
-        <span>显示/删除箭头</span>
-      </el-button>
-      <el-button @click="handleShapeClick('arrow')" :class="typeName == 'arrow' ? 'active' : ''">
-        <span>开始创建箭头</span>
-      </el-button>
-      <el-button @click="undo">
-        <span>撤销</span>
-      </el-button>
-      <el-button @click="redo">
-        <span>重做</span>
-      </el-button>
-      <el-button @click="handleClear">
-        <span>清空</span>
-      </el-button>
-      <el-button @click="isEditable = false">退出编辑模式</el-button>
-      <!-- <div class="toolItem" :class="['toolItem']">
-        <span>下载</span>
-      </div> -->
-    </div>
+    <ToolBar :canEditable="props.canEditable" @undo="undo" @redo="redo" @handleClear="handleClear"></ToolBar>
     <el-button size="large" type="primary" plain :disabled="!isPreAble" class="pre" @click="pre">pre</el-button>
     <el-button size="large" type="primary" plain :disabled="!isNextAble" class="next" @click="next">next</el-button>
     <el-dialog width="30%" v-model="arrDialogVisible">
@@ -863,35 +753,6 @@ onMounted(() => {
   user-select: none;
   // text-align: center;
   //   color: @primary;
-  .toolbar {
-    position: absolute;
-    top: -7vh;
-    left: 16px;
-    height: 5vh;
-    padding: 0 10px;
-    background-color: white;
-    border: 1px solid rgba(0, 0, 0, 0.5);
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    &.active {
-      background-color: rgba(0, 0, 0, 0.5);
-      color: white;
-    }
-    .rect {
-      cursor: grab;
-    }
-    .array {
-      cursor: pointer;
-      input {
-        border: none;
-        height: 28px;
-        width: 50px;
-        font-size: 12px;
-        text-align: center;
-      }
-    }
-  }
   .static-area {
     background-color: rgba(250, 250, 250);
     position: absolute;

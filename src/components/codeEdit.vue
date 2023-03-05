@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, defineEmits, defineProps, computed, onMounted, watch } from 'vue';
+import { ref, shallowRef, computed, onMounted, watch } from 'vue';
 import { Codemirror } from 'vue-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { java } from '@codemirror/lang-java';
