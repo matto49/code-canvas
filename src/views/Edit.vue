@@ -1,13 +1,17 @@
 <script setup>
-import { useRoute } from 'vue-router';
-import { getCanvas, addCanvas } from '../api';
-import { ElMessage } from 'element-plus';
-import codeEdit from '@/components/codeEdit.vue';
-import canvasBoard from '@/components/CanvasBoard.vue';
-import { getList } from '../api';
-import { cloneDeep } from 'xijs';
-import { reactive, ref, unref, watch, toRaw, onMounted } from 'vue';
-import router from '../router';
+import { useRoute } from "vue-router";
+import { getCanvas, addCanvas } from "../api";
+import { ElMessage } from "element-plus";
+import codeEdit from "@/components/codeEdit.vue";
+import canvasBoard from "@/components/CanvasBoard.vue";
+import { getList } from "../api";
+import { cloneDeep } from "xijs";
+import { diff } from "@/utils/tool";
+import { reactive, ref, unref, watch, toRaw, onMounted } from "vue";
+import router from "../router";
+import { useStore } from "@/utils/store";
+const store = useStore();
+
 const route = useRoute();
 let canvasRect = reactive([
   {
@@ -15,6 +19,7 @@ let canvasRect = reactive([
     lineCnt: 1,
   },
 ]);
+
 // 是否可用编辑
 const canEditable = ref(false);
 const selection = reactive({});
@@ -25,6 +30,7 @@ const isNextAble = ref(false);
 // 用于判断是否可以执行next
 let maxStep = 0;
 let curStep = ref(0);
+
 function pre() {
   curStep.value--;
   // 仅当next到底了，才能进行下一步操作
@@ -32,6 +38,7 @@ function pre() {
   isNextAble.value = true;
   if (curStep.value == 0) isPreAble.value = false;
 }
+
 function next() {
   curStep.value++;
   maxStep = Math.max(curStep.value, maxStep);
@@ -39,8 +46,9 @@ function next() {
   isPreAble.value = true;
   if (curStep.value == maxStep) isNextAble.value = false;
 }
+
 let preLine = 1;
-let code = ref('');
+let code = ref("");
 function focus(lineCnt) {
   // 无法禁止codeMirror的点击变更背景颜色行为，所以使用click之前那一行来实现
   if (!canEditable.value) {
@@ -59,20 +67,29 @@ function focus(lineCnt) {
   preLine = lineCnt;
   canvasRect[curStep.value] = cloneDeep(canvasRect[curStep.value - 1]);
   canvasRect[curStep.value].lineCnt = lineCnt;
-  // canvasRect[curStep.value].lineCnt = lineCnt;
 }
-function changeCanvas(rectData) {
-  const value = rectData.map((item) => toRaw(item));
-  canvasRect[curStep.value].rect = value;
-}
+
+// 同步内容
+watch(
+  () => store.canvasContent,
+  () => {
+    const value = store.canvasContent.map((item) => toRaw(item));
+    if (diff(canvasRect[curStep.value].rect, value)) {
+      canvasRect[curStep.value].rect = value;
+    }
+  },
+  { deep: true }
+);
+
 // 模拟点击代码行背景颜色变化
 function click(line) {
-  const lineDom = document.querySelectorAll('.cm-line');
+  const lineDom = document.querySelectorAll(".cm-line");
   for (let i = 0; i < lineDom.length; i++) {
-    lineDom[i].classList.remove('cm-activeLine');
+    lineDom[i].classList.remove("cm-activeLine");
   }
-  if (line <= lineDom.length) lineDom[line - 1].classList.add('cm-activeLine');
+  if (line <= lineDom.length) lineDom[line - 1].classList.add("cm-activeLine");
 }
+
 async function save(code_body, name) {
   const layers = canvasRect.map((item) => {
     return {
@@ -83,17 +100,18 @@ async function save(code_body, name) {
   try {
     const res = await addCanvas({ layers, code_body, name });
     ElMessage({
-      message: '保存成功',
-      type: 'success',
+      message: "保存成功",
+      type: "success",
     });
-    router.push('/list');
+    router.push("/list");
   } catch (err) {
     ElMessage({
-      message: '保存失败',
-      type: 'warning',
+      message: "保存失败",
+      type: "warning",
     });
   }
 }
+
 onMounted(async () => {
   const query = route.query;
   if (query.canEditable) canEditable.value = true;
@@ -115,15 +133,15 @@ onMounted(async () => {
 <script>
 let id = 1;
 export default {
-  name: 'simple',
-  display: 'Simple',
+  name: "simple",
+  display: "Simple",
   order: 0,
   data() {
     return {
       list: [
-        { name: 'John', id: 0 },
-        { name: 'Joao', id: 1 },
-        { name: 'Jean', id: 2 },
+        { name: "John", id: 0 },
+        { name: "Joao", id: 1 },
+        { name: "Jean", id: 2 },
       ],
     };
   },
@@ -143,7 +161,13 @@ export default {
 </style>
 <template>
   <div class="container">
-    <codeEdit class="code" @focus="focus" :code="code" :canEditable="canEditable" @save="save"></codeEdit>
+    <codeEdit
+      class="code"
+      @focus="focus"
+      :code="code"
+      :canEditable="canEditable"
+      @save="save"
+    ></codeEdit>
     <canvasBoard
       :canvasRect="canvasRect[curStep].rect"
       :curStep="curStep"
@@ -152,7 +176,6 @@ export default {
       :canEditable="canEditable"
       @next="next"
       @pre="pre"
-      @change="changeCanvas"
       class="canvas"
       ref="canvas"
     ></canvasBoard>
